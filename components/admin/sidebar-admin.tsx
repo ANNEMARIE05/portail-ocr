@@ -85,7 +85,7 @@ export function SidebarAdmin({ onDeconnexion }: PropsSidebarAdmin) {
           <>
             <span className="flex-1">{element.label}</span>
             {element.badge && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-medium text-white">
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
                 {element.badge}
               </span>
             )}
@@ -105,7 +105,7 @@ export function SidebarAdmin({ onDeconnexion }: PropsSidebarAdmin) {
       {/* Logo */}
       <div className={cn('flex h-16 items-center border-b border-slate-200 px-4', estReduit && 'justify-center px-2')}>
         <Link href="/admin" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-900">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
             <ScanLine className="h-5 w-5 text-white" />
           </div>
           {!estReduit && <span className="text-lg font-semibold text-slate-900">OCR Portal</span>}

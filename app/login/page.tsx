@@ -36,18 +36,18 @@ export default function PageConnexion() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-background">
       {/* Motifs décoratifs subtils */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-100/40 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-100/30 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
       </div>
 
       <div className="relative flex min-h-screen items-center justify-center px-4 py-12">
         <div className="w-full max-w-md space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Logo et titre */}
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 shadow-lg shadow-blue-500/25 mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-lg bg-primary shadow-lg shadow-primary/25 mb-4">
               <svg
                 className="w-8 h-8 text-white"
                 fill="none"
@@ -71,7 +71,7 @@ export default function PageConnexion() {
           </div>
 
           {/* Carte de connexion */}
-          <Card className="border-slate-200/60 shadow-xl shadow-slate-200/50 backdrop-blur-sm bg-white/80">
+          <Card className="border-border/60 shadow-xl shadow-primary/10 backdrop-blur-sm bg-card/80">
             <CardHeader className="space-y-1 pb-4">
               <CardTitle className="text-xl font-semibold text-center">Connexion</CardTitle>
               <CardDescription className="text-center">
@@ -89,7 +89,7 @@ export default function PageConnexion() {
                     <Mail
                       className={cn(
                         'absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors duration-200',
-                        champFocus === 'email' ? 'text-blue-600' : 'text-slate-400'
+                        champFocus === 'email' ? 'text-primary' : 'text-muted-foreground'
                       )}
                     />
                     <Input
@@ -101,9 +101,9 @@ export default function PageConnexion() {
                       onFocus={() => setChampFocus('email')}
                       onBlur={() => setChampFocus(null)}
                       className={cn(
-                        'pl-10 h-11 border-slate-200 bg-slate-50/50 transition-all duration-200',
-                        'focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
-                        champFocus === 'email' && 'bg-white border-blue-500 ring-2 ring-blue-500/20'
+                        'pl-10 h-11 border-border bg-muted/50 transition-all duration-200',
+                        'focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20',
+                        champFocus === 'email' && 'bg-card border-primary ring-2 ring-primary/20'
                       )}
                       disabled={estChargement}
                       required
@@ -119,7 +119,7 @@ export default function PageConnexion() {
                     </label>
                     <Link
                       href="/reinitialisation"
-                      className="text-xs text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                      className="text-xs text-primary hover:text-primary/80 hover:underline transition-colors"
                     >
                       Mot de passe oublié ?
                     </Link>
@@ -128,7 +128,7 @@ export default function PageConnexion() {
                     <Lock
                       className={cn(
                         'absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors duration-200',
-                        champFocus === 'motDePasse' ? 'text-blue-600' : 'text-slate-400'
+                        champFocus === 'motDePasse' ? 'text-primary' : 'text-muted-foreground'
                       )}
                     />
                     <Input
@@ -140,9 +140,9 @@ export default function PageConnexion() {
                       onFocus={() => setChampFocus('motDePasse')}
                       onBlur={() => setChampFocus(null)}
                       className={cn(
-                        'pl-10 pr-10 h-11 border-slate-200 bg-slate-50/50 transition-all duration-200',
-                        'focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
-                        champFocus === 'motDePasse' && 'bg-white border-blue-500 ring-2 ring-blue-500/20'
+                        'pl-10 pr-10 h-11 border-border bg-muted/50 transition-all duration-200',
+                        'focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20',
+                        champFocus === 'motDePasse' && 'bg-card border-primary ring-2 ring-primary/20'
                       )}
                       disabled={estChargement}
                       required
@@ -174,10 +174,9 @@ export default function PageConnexion() {
                   type="submit"
                   disabled={estChargement}
                   className={cn(
-                    'w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600',
-                    'hover:from-blue-700 hover:to-indigo-700',
-                    'text-white font-medium shadow-lg shadow-blue-500/25',
-                    'transition-all duration-200 hover:shadow-xl hover:shadow-blue-500/30',
+                    'w-full h-11 bg-primary hover:bg-primary/90',
+                    'text-primary-foreground font-medium shadow-lg shadow-primary/25',
+                    'transition-all duration-200 hover:shadow-xl hover:shadow-primary/30',
                     'disabled:opacity-70 disabled:cursor-not-allowed'
                   )}
                 >
@@ -220,11 +219,11 @@ export default function PageConnexion() {
           {/* Footer */}
           <p className="text-center text-xs text-slate-400">
             En vous connectant, vous acceptez nos{' '}
-            <Link href="#" className="text-blue-600 hover:underline">
+            <Link href="#" className="text-primary hover:underline">
               conditions d&apos;utilisation
             </Link>{' '}
             et notre{' '}
-            <Link href="#" className="text-blue-600 hover:underline">
+            <Link href="#" className="text-primary hover:underline">
               politique de confidentialité
             </Link>
           </p>
