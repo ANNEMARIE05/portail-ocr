@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { User, Mail, Phone, Shield, Key, Save, Camera } from 'lucide-react'
+import { User, Phone, Shield, Key, Save, Camera } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,15 @@ import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Spinner } from '@/components/ui/spinner'
 import { BadgeRole } from '@/components/admin/status-badge'
+
+/** Aperçu fixe (non lié aux champs du formulaire) */
+const PROFIL_CARTE = {
+  prenom: 'Jean-Pierre',
+  nom: 'Durand',
+  email: 'jp.durand@ocrportal.fr',
+  telephone: '06 12 34 56 78',
+  role: 'super-admin' as const,
+}
 
 export default function PageProfil() {
   const [estEnregistrement, setEstEnregistrement] = useState(false)
@@ -48,46 +57,50 @@ export default function PageProfil() {
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Carte profil */}
-        <Card className="border-border/40 shadow-sm lg:col-span-1">
-          <CardContent className="flex flex-col items-center p-6">
-            <div className="relative">
-              <Avatar className="h-24 w-24">
-                <AvatarFallback className="bg-slate-900 text-2xl text-white">
-                  {profil.prenom[0]}
-                  {profil.nom[0]}
-                </AvatarFallback>
-              </Avatar>
-              <button className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-slate-100 transition-colors hover:bg-slate-200">
-                <Camera className="h-4 w-4 text-slate-600" />
-              </button>
-            </div>
-            
-            <h2 className="mt-4 text-xl font-semibold text-foreground">
-              {profil.prenom} {profil.nom}
-            </h2>
-            <p className="text-sm text-muted-foreground">{profil.email}</p>
-            
-            <div className="mt-3">
-              <BadgeRole role={profil.role} />
-            </div>
+        {/* Carte profil : aperçu statique, compact, reste visible au défilement */}
+        <div className="shrink-0 self-start lg:sticky lg:top-20 lg:z-10 lg:col-span-1">
+          <Card className="border-border/40 shadow-sm overflow-visible">
+            <CardContent className="flex flex-col items-center p-4">
+              <div className="relative">
+                <Avatar className="h-14 w-14">
+                  <AvatarFallback className="bg-slate-900 text-sm text-white">
+                    {PROFIL_CARTE.prenom[0]}
+                    {PROFIL_CARTE.nom[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <button
+                  type="button"
+                  className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-slate-100 transition-colors hover:bg-slate-200"
+                  aria-label="Changer la photo"
+                >
+                  <Camera className="h-3 w-3 text-slate-600" />
+                </button>
+              </div>
 
-            <div className="mt-6 w-full space-y-3 border-t border-border/40 pt-6">
-              <div className="flex items-center gap-3 text-sm">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">{profil.email}</span>
+              <h2 className="mt-2 text-center text-sm font-semibold text-foreground">
+                {PROFIL_CARTE.prenom} {PROFIL_CARTE.nom}
+              </h2>
+              <p className="mt-0.5 max-w-full truncate px-1 text-center text-xs text-muted-foreground">
+                {PROFIL_CARTE.email}
+              </p>
+
+              <div className="mt-2 scale-90">
+                <BadgeRole role={PROFIL_CARTE.role} />
               </div>
-              <div className="flex items-center gap-3 text-sm">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">{profil.telephone}</span>
+
+              <div className="mt-3 w-full space-y-2 border-t border-border/40 pt-3">
+                <div className="flex items-center gap-2 text-xs">
+                  <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate text-muted-foreground">{PROFIL_CARTE.telephone}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <Shield className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="text-muted-foreground">2FA activé</span>
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-sm">
-                <Shield className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">2FA activé</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Formulaires */}
         <div className="space-y-6 lg:col-span-2">

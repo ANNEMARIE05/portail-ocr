@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import type { ReactNode } from 'react'
 import {
   Table,
   TableBody,
@@ -11,6 +11,13 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -20,6 +27,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ColonneTable, ActionLigne, ConfigPagination } from '@/lib/types-admin'
+import { OPTIONS_ELEMENTS_PAR_PAGE_DEFAUT } from '@/lib/constants-pagination'
 
 interface PropsTableDonnees<T> {
   colonnes: ColonneTable<T>[]
@@ -27,9 +35,17 @@ interface PropsTableDonnees<T> {
   estChargement?: boolean
   pagination?: ConfigPagination
   onChangementPage?: (page: number) => void
+  /** Propositions pour « X résultats par page » (affiché dans la barre de pagination). */
+  optionsParPage?: readonly number[]
+  onChangementParPage?: (parPage: number) => void
   actions?: ActionLigne<T>[]
   lignesParPageSkeleton?: number
   idAccesseur: (item: T) => string
+  /** Clic sur la ligne (hors menu actions) pour ouvrir un détail, une modale, etc. */
+  onLigneClick?: (item: T) => void
+  /** Place le sélecteur « par page » au-dessus du tableau, en flex avec `aCoteSelectParPage`. */
+  selectParPageAuDessusDuTableau?: boolean
+  aCoteSelectParPage?: ReactNode
 }
 
 export function TableDonnees<T>({
@@ -38,25 +54,31 @@ export function TableDonnees<T>({
   estChargement = false,
   pagination,
   onChangementPage,
+  optionsParPage = OPTIONS_ELEMENTS_PAR_PAGE_DEFAUT,
+  onChangementParPage,
   actions,
   lignesParPageSkeleton = 5,
   idAccesseur,
+  onLigneClick,
+  selectParPageAuDessusDuTableau = false,
+  aCoteSelectParPage,
 }: PropsTableDonnees<T>) {
-  const nombrePages = pagination ? Math.ceil(pagination.total / pagination.parPage) : 1
-  const debut = pagination ? (pagination.page - 1) * pagination.parPage + 1 : 1
-  const fin = pagination ? Math.min(pagination.page * pagination.parPage, pagination.total) : donnees.length
+  const parPageEffectif = pagination ? Math.max(1, pagination.parPage) : 1
+  const nombrePages = pagination ? Math.max(1, Math.ceil(pagination.total / parPageEffectif)) : 1
+  const debut = pagination ? (pagination.page - 1) * parPageEffectif + 1 : 1
+  const fin = pagination ? Math.min(pagination.page * parPageEffectif, pagination.total) : donnees.length
 
   const renderSkeleton = () => (
     <>
       {Array.from({ length: lignesParPageSkeleton }).map((_, i) => (
         <TableRow key={i}>
           {colonnes.map((col, j) => (
-            <TableCell key={j}>
+            <TableCell key={j} className={cn('py-3', col.classNameCellule)}>
               <Skeleton className="h-4 w-full" />
             </TableCell>
           ))}
           {actions && (
-            <TableCell>
+            <TableCell className="py-3">
               <Skeleton className="h-8 w-8" />
             </TableCell>
           )}
@@ -99,8 +121,39 @@ export function TableDonnees<T>({
     )
   }
 
+  const selectParPage = onChangementParPage && pagination && (
+    <div className="flex items-center gap-2 shrink-0">
+      <span className="text-sm text-muted-foreground whitespace-nowrap">Par page</span>
+      <Select
+        value={String(pagination.parPage)}
+        onValueChange={(v) => onChangementParPage(Number(v))}
+        disabled={estChargement}
+      >
+        <SelectTrigger className="h-8 w-[100px]" aria-label="Nombre de résultats par page">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {(optionsParPage.includes(pagination.parPage)
+            ? [...optionsParPage]
+            : [...optionsParPage, pagination.parPage].sort((a, b) => a - b)
+          ).map((n) => (
+            <SelectItem key={n} value={String(n)}>
+              {n}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+
   return (
     <div className="space-y-4">
+      {selectParPageAuDessusDuTableau && (selectParPage || aCoteSelectParPage) && (
+        <div className="flex w-full flex-wrap items-center gap-3 sm:justify-between">
+          {aCoteSelectParPage}
+          {selectParPage}
+        </div>
+      )}
       <div className="rounded-md border border-border/40 overflow-hidden">
         <Table>
           <TableHeader>
@@ -114,7 +167,11 @@ export function TableDonnees<T>({
                   {col.label}
                 </TableHead>
               ))}
-              {actions && <TableHead className="w-12" />}
+              {actions && (
+                <TableHead className="w-12 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Actions
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -128,13 +185,21 @@ export function TableDonnees<T>({
               </TableRow>
             ) : (
               donnees.map((item) => (
-                <TableRow key={idAccesseur(item)} className="transition-colors">
+                <TableRow
+                  key={idAccesseur(item)}
+                  className={cn('transition-colors', onLigneClick && 'cursor-pointer hover:bg-muted/40')}
+                  onClick={() => onLigneClick?.(item)}
+                >
                   {colonnes.map((col) => (
-                    <TableCell key={String(col.id)} className="py-3">
+                    <TableCell key={String(col.id)} className={cn('py-3', col.classNameCellule)}>
                       {col.accesseur(item)}
                     </TableCell>
                   ))}
-                  {actions && <TableCell className="py-3">{renderActions(item)}</TableCell>}
+                  {actions && (
+                    <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
+                      {renderActions(item)}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
@@ -143,11 +208,14 @@ export function TableDonnees<T>({
       </div>
 
       {pagination && pagination.total > 0 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Affichage de {debut} à {fin} sur {pagination.total} résultats
-          </p>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <p className="text-sm text-muted-foreground">
+              Affichage de {debut} à {fin} sur {pagination.total} résultats
+            </p>
+            {onChangementParPage && !selectParPageAuDessusDuTableau && selectParPage}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"

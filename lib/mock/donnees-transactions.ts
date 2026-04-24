@@ -18,7 +18,7 @@ export const packsMock: Pack[] = [
     description: 'Idéal pour tester notre service OCR avec un petit volume de documents.',
     quotas: 50,
     prix: 0,
-    devise: 'EUR',
+    devise: 'XOF',
     dureeValidite: 30,
     estActif: true,
     dateCreation: new Date('2022-01-01'),
@@ -29,8 +29,8 @@ export const packsMock: Pack[] = [
     nom: 'Starter',
     description: 'Pour les indépendants et petites structures avec un besoin régulier.',
     quotas: 100,
-    prix: 29,
-    devise: 'EUR',
+    prix: 19_023,
+    devise: 'XOF',
     dureeValidite: 30,
     estActif: true,
     dateCreation: new Date('2022-01-01'),
@@ -41,8 +41,8 @@ export const packsMock: Pack[] = [
     nom: 'Business',
     description: 'La solution idéale pour les PME avec un volume de documents important.',
     quotas: 500,
-    prix: 99,
-    devise: 'EUR',
+    prix: 64_940,
+    devise: 'XOF',
     dureeValidite: 30,
     estActif: true,
     dateCreation: new Date('2022-01-01'),
@@ -53,8 +53,8 @@ export const packsMock: Pack[] = [
     nom: 'Premium',
     description: 'Pour les entreprises exigeantes avec de gros volumes et un support prioritaire.',
     quotas: 1000,
-    prix: 149,
-    devise: 'EUR',
+    prix: 97_738,
+    devise: 'XOF',
     dureeValidite: 30,
     estActif: true,
     dateCreation: new Date('2022-03-15'),
@@ -65,8 +65,8 @@ export const packsMock: Pack[] = [
     nom: 'Enterprise',
     description: 'Solution sur mesure pour les grandes entreprises avec API dédiée et SLA.',
     quotas: 5000,
-    prix: 499,
-    devise: 'EUR',
+    prix: 327_323,
+    devise: 'XOF',
     dureeValidite: 30,
     estActif: true,
     dateCreation: new Date('2022-06-01'),
@@ -77,8 +77,8 @@ export const packsMock: Pack[] = [
     nom: 'Promo Été',
     description: 'Offre limitée été 2023 - Plus disponible.',
     quotas: 200,
-    prix: 49,
-    devise: 'EUR',
+    prix: 32_142,
+    devise: 'XOF',
     dureeValidite: 60,
     estActif: false,
     dateCreation: new Date('2023-06-01'),
@@ -87,7 +87,7 @@ export const packsMock: Pack[] = [
 ]
 
 const methodessPaiement = ['Carte bancaire', 'PayPal', 'Virement', 'Prélèvement']
-const statuts: Array<'complete' | 'en-attente' | 'echoue' | 'rembourse'> = ['complete', 'complete', 'complete', 'complete', 'complete', 'en-attente', 'echoue', 'rembourse']
+const statuts: Array<'succes' | 'echec'> = ['succes', 'succes', 'succes', 'succes', 'succes', 'succes', 'echec', 'echec']
 
 export function genererTransactions(nombre: number): Transaction[] {
   const transactions: Transaction[] = []
@@ -105,7 +105,7 @@ export function genererTransactions(nombre: number): Transaction[] {
       utilisateurNom: `${utilisateur.prenom} ${utilisateur.nom}`,
       utilisateurEmail: utilisateur.email,
       montant: pack.prix,
-      devise: 'EUR',
+      devise: pack.devise,
       packNom: pack.nom,
       dateTransaction: genererDateAleatoire(dateDebut, dateFin),
       statut: statuts[Math.floor(Math.random() * statuts.length)],

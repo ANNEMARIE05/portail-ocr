@@ -1,216 +1,223 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Check, X, Clock, Mail, AlertTriangle } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Check, Inbox, X } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { ChargeurPage } from '@/components/admin/page-loader'
-import { BadgeStatut } from '@/components/admin/status-badge'
+import { ChampRecherche } from '@/components/admin/search-input'
 import { ModaleConfirmation } from '@/components/admin/confirmation-modal'
+import { BadgeStatutDemandeSuppression } from '@/components/admin/status-badge'
+import { TableDonnees } from '@/components/admin/data-table'
 import { recupererDemandesSuppression, traiterDemandeSuppression } from '@/lib/api/admin-service'
-import type { DemandeSuppressionCompte } from '@/lib/types-admin'
-import { formaterDateRelative, formaterDateCourte, genererInitiales } from '@/lib/utils/formatage'
-import { cn } from '@/lib/utils'
+import type { ActionLigne, ColonneTable, ConfigPagination, DemandeSuppressionCompte } from '@/lib/types-admin'
+import { formaterDateCourte } from '@/lib/utils/formatage'
 
 export default function PageDemandesSuppression() {
   const [estChargement, setEstChargement] = useState(true)
   const [demandes, setDemandes] = useState<DemandeSuppressionCompte[]>([])
-  const [ongletActif, setOngletActif] = useState('en-attente')
-  
+  const [pagination, setPagination] = useState<ConfigPagination>({ page: 1, parPage: 10, total: 0 })
+  const [recherche, setRecherche] = useState('')
+
   const [demandeSelectionnee, setDemandeSelectionnee] = useState<DemandeSuppressionCompte | null>(null)
   const [modaleApprobationOuverte, setModaleApprobationOuverte] = useState(false)
   const [modaleRejetOuverte, setModaleRejetOuverte] = useState(false)
   const [actionEnCours, setActionEnCours] = useState(false)
 
-  useEffect(() => {
-    const chargerDonnees = async () => {
-      setEstChargement(true)
-      const reponse = await recupererDemandesSuppression()
-      if (reponse.succes && reponse.donnees) {
-        setDemandes(reponse.donnees)
+  const chargerDemandes = useCallback(async () => {
+    setEstChargement(true)
+    const reponse = await recupererDemandesSuppression(pagination.page, pagination.parPage, {
+      recherche,
+    })
+    if (reponse.succes && reponse.donnees) {
+      setDemandes(reponse.donnees)
+      if (reponse.pagination) {
+        setPagination(reponse.pagination)
       }
-      setEstChargement(false)
     }
-    chargerDonnees()
-  }, [])
+    setEstChargement(false)
+  }, [pagination.page, pagination.parPage, recherche])
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void chargerDemandes()
+    })
+  }, [chargerDemandes])
+
+  const gererChangementPage = (nouvellePage: number) => {
+    setPagination((prev) => ({ ...prev, page: nouvellePage }))
+  }
+
+  const gererRecherche = (terme: string) => {
+    setRecherche(terme)
+    setPagination((prev) => ({ ...prev, page: 1 }))
+  }
 
   const traiterDemande = async (decision: 'approuve' | 'rejete') => {
     if (!demandeSelectionnee) return
-    
+
     setActionEnCours(true)
     const reponse = await traiterDemandeSuppression(
       demandeSelectionnee.id,
       decision,
       'Jean-Pierre Durand'
     )
-    
-    if (reponse.succes && reponse.donnees) {
-      setDemandes((prev) =>
-        prev.map((d) => (d.id === demandeSelectionnee.id ? reponse.donnees! : d))
-      )
+
+    if (reponse.succes) {
+      await chargerDemandes()
     }
-    
+
     setActionEnCours(false)
     setModaleApprobationOuverte(false)
     setModaleRejetOuverte(false)
+    setDemandeSelectionnee(null)
   }
 
-  const demandesFiltrees = demandes.filter((d) => {
-    if (ongletActif === 'en-attente') return d.statut === 'en-attente'
-    if (ongletActif === 'traitees') return d.statut !== 'en-attente'
-    return true
-  })
+  const colonnes: ColonneTable<DemandeSuppressionCompte>[] = useMemo(
+    () => [
+      {
+        id: 'utilisateur',
+        label: 'Utilisateur',
+        accesseur: (d) => (
+          <div className="flex min-w-0 max-w-[280px] flex-col gap-0.5">
+            <span className="truncate font-medium text-foreground">{d.utilisateurNom}</span>
+            <span className="truncate text-sm text-muted-foreground">{d.utilisateurEmail}</span>
+          </div>
+        ),
+        classNameCellule: 'min-w-[12rem]',
+      },
+      {
+        id: 'raison',
+        label: 'Motif',
+        accesseur: (d) => (
+          <p className="whitespace-pre-line break-words text-sm text-foreground">
+            {d.raison}
+          </p>
+        ),
+        classNameCellule: 'max-w-md min-w-[12rem]',
+      },
+      {
+        id: 'statut',
+        label: 'Statut',
+        accesseur: (d) => <BadgeStatutDemandeSuppression statut={d.statut} />,
+        classNameCellule: 'whitespace-nowrap',
+      },
+      {
+        id: 'datedemande',
+        label: 'Date de création',
+        accesseur: (d) => (
+          <span className="whitespace-nowrap text-sm text-muted-foreground">
+            {formaterDateCourte(d.datedemande)}
+          </span>
+        ),
+      },
+    ],
+    []
+  )
 
-  const getBadgeStatut = (statut: DemandeSuppressionCompte['statut']) => {
-    switch (statut) {
-      case 'en-attente':
-        return <BadgeStatut type="attention">En attente</BadgeStatut>
-      case 'approuve':
-        return <BadgeStatut type="succes">Approuvée</BadgeStatut>
-      case 'rejete':
-        return <BadgeStatut type="erreur">Rejetée</BadgeStatut>
-    }
-  }
+  const actionsLigne: ActionLigne<DemandeSuppressionCompte>[] = useMemo(
+    () => [
+      {
+        id: 'confirmer',
+        label: 'Confirmer la suppression',
+        icone: Check,
+        onClick: (d) => {
+          setDemandeSelectionnee(d)
+          setModaleApprobationOuverte(true)
+        },
+        condition: (d) => d.statut === 'en-attente',
+      },
+      {
+        id: 'annuler',
+        label: 'Annuler la demande',
+        icone: X,
+        onClick: (d) => {
+          setDemandeSelectionnee(d)
+          setModaleRejetOuverte(true)
+        },
+        condition: (d) => d.statut === 'en-attente',
+      },
+    ],
+    []
+  )
 
-  if (estChargement) {
+  if (estChargement && demandes.length === 0) {
     return <ChargeurPage avecTable />
   }
 
-  const nombreEnAttente = demandes.filter((d) => d.statut === 'en-attente').length
-
   return (
     <div className="space-y-6">
-      <Tabs value={ongletActif} onValueChange={setOngletActif}>
-        <TabsList>
-          <TabsTrigger value="en-attente" className="gap-2">
-            <Clock className="h-4 w-4" />
-            En attente
-            {nombreEnAttente > 0 && (
-              <span className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-medium text-white">
-                {nombreEnAttente}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="traitees">Traitées</TabsTrigger>
-          <TabsTrigger value="toutes">Toutes</TabsTrigger>
-        </TabsList>
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold tracking-tight">Demandes de suppression</h2>
+        <p className="text-sm text-muted-foreground">
+          Traitement des demandes de fermeture de compte (validation ou refus).
+        </p>
+      </div>
 
-        <TabsContent value={ongletActif} className="mt-6">
-          {demandesFiltrees.length === 0 ? (
-            <Card className="border-border/40">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                  <Check className="h-6 w-6 text-slate-500" />
-                </div>
-                <h3 className="mt-4 text-lg font-medium">Aucune demande</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {ongletActif === 'en-attente'
-                    ? 'Toutes les demandes ont été traitées.'
-                    : 'Aucune demande trouvée.'}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {demandesFiltrees.map((demande) => (
-                <Card key={demande.id} className="border-border/40 shadow-sm">
-                  <CardContent className="p-6">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex items-start gap-4">
-                        <Avatar className="h-12 w-12">
-                          <AvatarFallback className="bg-slate-100 text-lg font-medium text-slate-600">
-                            {genererInitiales(
-                              demande.utilisateurNom.split(' ')[0],
-                              demande.utilisateurNom.split(' ')[1] || ''
-                            )}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-3">
-                            <h3 className="font-semibold text-foreground">
-                              {demande.utilisateurNom}
-                            </h3>
-                            {getBadgeStatut(demande.statut)}
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Mail className="h-3.5 w-3.5" />
-                            {demande.utilisateurEmail}
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            Demandé {formaterDateRelative(demande.datedemande)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {demande.statut === 'en-attente' && (
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setDemandeSelectionnee(demande)
-                              setModaleRejetOuverte(true)
-                            }}
-                          >
-                            <X className="mr-2 h-4 w-4" />
-                            Rejeter
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setDemandeSelectionnee(demande)
-                              setModaleApprobationOuverte(true)
-                            }}
-                          >
-                            <Check className="mr-2 h-4 w-4" />
-                            Approuver
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-4 rounded-lg border border-border/40 bg-slate-50 p-4">
-                      <p className="text-sm font-medium text-muted-foreground">Raison de la demande</p>
-                      <p className="mt-1 text-sm text-foreground">{demande.raison}</p>
-                    </div>
-
-                    {demande.statut !== 'en-attente' && demande.traitePar && (
-                      <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>Traitée par {demande.traitePar}</span>
-                        <span>•</span>
-                        <span>{formaterDateCourte(demande.dateTraitement!)}</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+      <Card className="border-border/40 shadow-sm">
+        <CardContent className="pt-6">
+          {pagination.total === 0 && !estChargement ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <Inbox className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <h3 className="mt-4 text-lg font-medium">Aucune demande</h3>
+              <p className="mt-1 text-center text-sm text-muted-foreground">
+                {recherche.trim()
+                  ? 'Aucun résultat pour cette recherche. Modifiez les termes ou effacez la recherche.'
+                  : 'Il n’y a aucune demande de suppression pour le moment.'}
+              </p>
             </div>
+          ) : (
+            <TableDonnees
+              colonnes={colonnes}
+              donnees={demandes}
+              estChargement={estChargement}
+              pagination={pagination}
+              onChangementPage={gererChangementPage}
+              onChangementParPage={(parPage) =>
+                setPagination((prev) => ({ ...prev, parPage, page: 1 }))
+              }
+              selectParPageAuDessusDuTableau
+              aCoteSelectParPage={
+                <ChampRecherche
+                  placeholder="Rechercher par nom, email, motif…"
+                  valeur={recherche}
+                  onChange={gererRecherche}
+                  className="min-w-0 w-full flex-1 sm:min-w-[220px] sm:max-w-md"
+                />
+              }
+              actions={actionsLigne}
+              idAccesseur={(d) => d.id}
+              lignesParPageSkeleton={pagination.parPage}
+            />
           )}
-        </TabsContent>
-      </Tabs>
+        </CardContent>
+      </Card>
 
-      {/* Modale approbation */}
       <ModaleConfirmation
         estOuverte={modaleApprobationOuverte}
-        onFermer={() => setModaleApprobationOuverte(false)}
+        onFermer={() => {
+          setModaleApprobationOuverte(false)
+          setDemandeSelectionnee(null)
+        }}
         onConfirmer={() => traiterDemande('approuve')}
-        titre="Approuver la suppression"
-        description={`Êtes-vous sûr de vouloir approuver la suppression du compte de ${demandeSelectionnee?.utilisateurNom} ? Cette action supprimera définitivement toutes les données associées.`}
-        texteConfirmation="Approuver la suppression"
+        titre="Confirmer la suppression du compte"
+        description={`Vous allez approuver la suppression définitive du compte de ${demandeSelectionnee?.utilisateurNom} (${demandeSelectionnee?.utilisateurEmail}). Toutes les données associées seront supprimées.`}
+        texteConfirmation="Confirmer la suppression"
         variante="destructive"
         estChargement={actionEnCours}
       />
 
-      {/* Modale rejet */}
       <ModaleConfirmation
         estOuverte={modaleRejetOuverte}
-        onFermer={() => setModaleRejetOuverte(false)}
+        onFermer={() => {
+          setModaleRejetOuverte(false)
+          setDemandeSelectionnee(null)
+        }}
         onConfirmer={() => traiterDemande('rejete')}
-        titre="Rejeter la demande"
-        description={`Êtes-vous sûr de vouloir rejeter la demande de suppression de ${demandeSelectionnee?.utilisateurNom} ? L'utilisateur sera notifié.`}
-        texteConfirmation="Rejeter"
+        titre="Annuler la demande"
+        description={`Annuler la demande de suppression pour ${demandeSelectionnee?.utilisateurNom} ? L'utilisateur conservera son compte et sera notifié.`}
+        texteConfirmation="Annuler la demande"
         estChargement={actionEnCours}
       />
     </div>

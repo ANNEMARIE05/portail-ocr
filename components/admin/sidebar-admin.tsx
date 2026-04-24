@@ -33,8 +33,8 @@ const menuPrincipal: ElementMenu[] = [
   { label: 'Tableau de bord', href: '/admin/tableau', icone: LayoutDashboard },
   { label: 'Utilisateurs', href: '/admin/utilisateurs', icone: Users },
   { label: 'Administrateurs', href: '/admin/administrateurs', icone: ShieldCheck },
-  { label: 'Documents', href: '/admin/documents', icone: FileText },
-  { label: 'Clés API', href: '/admin/api', icone: Key },
+  { label: 'Gestion de quota', href: '/admin/documents', icone: FileText },
+  { label: "Gestion d'API", href: '/admin/api', icone: Key },
   { label: 'Transactions', href: '/admin/transactions', icone: CreditCard },
   { label: 'Packs', href: '/admin/packs', icone: Package },
 ]
@@ -51,11 +51,22 @@ const menuBas: ElementMenu[] = [
 
 interface PropsSidebarAdmin {
   onDeconnexion?: () => void
+  estReduit?: boolean
+  onEstReduitChange?: (estReduit: boolean) => void
 }
 
-export function SidebarAdmin({ onDeconnexion }: PropsSidebarAdmin) {
+export function SidebarAdmin({
+  onDeconnexion,
+  estReduit: estReduitControle,
+  onEstReduitChange,
+}: PropsSidebarAdmin) {
   const pathname = usePathname()
-  const [estReduit, setEstReduit] = useState(false)
+  const [estReduitInterne, setEstReduitInterne] = useState(false)
+  const estReduit = estReduitControle ?? estReduitInterne
+  const definirEstReduit = (value: boolean) => {
+    onEstReduitChange?.(value)
+    if (estReduitControle === undefined) setEstReduitInterne(value)
+  }
 
   const estActif = (href: string) => {
     if (href === '/admin/tableau') {
@@ -85,7 +96,7 @@ export function SidebarAdmin({ onDeconnexion }: PropsSidebarAdmin) {
           <>
             <span className="flex-1">{element.label}</span>
             {element.badge && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-medium text-white">
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
                 {element.badge}
               </span>
             )}
@@ -105,10 +116,10 @@ export function SidebarAdmin({ onDeconnexion }: PropsSidebarAdmin) {
       {/* Logo */}
       <div className={cn('flex h-16 items-center border-b border-slate-200 px-4', estReduit && 'justify-center px-2')}>
         <Link href="/admin" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-900">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
             <ScanLine className="h-5 w-5 text-white" />
           </div>
-          {!estReduit && <span className="text-lg font-semibold text-slate-900">OCR Portal</span>}
+          {!estReduit && <span className="text-lg font-semibold text-slate-900">Portail OCR</span>}
         </Link>
       </div>
 
@@ -152,7 +163,7 @@ export function SidebarAdmin({ onDeconnexion }: PropsSidebarAdmin) {
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => setEstReduit(!estReduit)}
+        onClick={() => definirEstReduit(!estReduit)}
         className={cn(
           'absolute -right-3 top-20 h-6 w-6 rounded-full border border-slate-200 bg-white shadow-sm',
           'hover:bg-slate-50'

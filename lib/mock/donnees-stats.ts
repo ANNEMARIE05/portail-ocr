@@ -14,6 +14,11 @@ export const statistiquesGlobales: StatistiquesGlobales = {
   variationRevenus: 5.2,
   tauxConversion: 3.8,
   variationTauxConversion: -0.4,
+  tempsMoyenTraitement: 1.2,
+  precisionMoyenne: 98.7,
+  variationPrecision: 0.4,
+  ticketsOuverts: 14,
+  variationTicketsOuverts: -18.5,
 }
 
 export function genererDonneesGraphique7Jours(): DonneesGraphique[] {
@@ -71,7 +76,7 @@ export const activitesRecentes: ActiviteRecente[] = [
     description: 'Achat pack Premium',
     utilisateur: 'Marc Leblanc',
     date: new Date(Date.now() - 3600000),
-    details: '149€ - 1000 documents',
+    details: '97 738 XOF - 1000 documents',
   },
   {
     id: 'act_003',
@@ -109,7 +114,7 @@ export const activitesRecentes: ActiviteRecente[] = [
     description: 'Achat pack Starter',
     utilisateur: 'Julie Petit',
     date: new Date(Date.now() - 18000000),
-    details: '29€ - 100 documents',
+    details: '19 023 XOF - 100 documents',
   },
   {
     id: 'act_008',

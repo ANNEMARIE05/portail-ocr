@@ -10,6 +10,7 @@ interface PropsChampRecherche {
   onChange: (valeur: string) => void
   delaiDebounce?: number
   className?: string
+  'aria-label'?: string
 }
 
 export function ChampRecherche({
@@ -18,12 +19,13 @@ export function ChampRecherche({
   onChange,
   delaiDebounce = 300,
   className,
+  'aria-label': ariaLabel,
 }: PropsChampRecherche) {
   const [valeurInterne, setValeurInterne] = useState(valeurExterne || '')
 
   useEffect(() => {
     if (valeurExterne !== undefined) {
-      setValeurInterne(valeurExterne)
+      queueMicrotask(() => setValeurInterne(valeurExterne))
     }
   }, [valeurExterne])
 
@@ -48,6 +50,7 @@ export function ChampRecherche({
         value={valeurInterne}
         onChange={(e) => setValeurInterne(e.target.value)}
         placeholder={placeholder}
+        aria-label={ariaLabel}
         className={cn(
           'h-10 w-full rounded-md border border-input bg-background pl-10 pr-10 text-sm',
           'placeholder:text-muted-foreground',

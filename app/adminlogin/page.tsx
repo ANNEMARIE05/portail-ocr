@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { lire2faRequisAdmin } from '@/lib/mfa-preference'
 
 export default function PageConnexionAdmin() {
   const router = useRouter()
@@ -26,9 +27,17 @@ export default function PageConnexionAdmin() {
     // Simulation d'appel API
     await new Promise((resolve) => setTimeout(resolve, 1500))
 
-    // Pour la démo : rediriger vers OTP admin
     if (email && motDePasse) {
-      router.push(`/otp?email=${encodeURIComponent(email)}&next=/admin/tableau&profile=admin`)
+      const cible = '/admin/tableau'
+      if (lire2faRequisAdmin()) {
+        router.push(
+          `/otp?email=${encodeURIComponent(email)}&next=${encodeURIComponent(
+            cible
+          )}&profile=admin`
+        )
+      } else {
+        router.push(cible)
+      }
     } else {
       setErreur('Veuillez remplir tous les champs')
       setEstChargement(false)

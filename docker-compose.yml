@@ -1,0 +1,19 @@
+services:
+  ocr-app:
+    build: .
+    container_name: ocr_app
+    env_file:
+      - .env
+    ports:
+      - "${APP_PORT}:80"  # On mappe le port 80 du conteneur au port 3000 de la machine
+    restart: unless-stopped
+    networks:
+      - ocr-app-net
+
+networks:
+  ocr-app-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${APP_SUBNET}
+          gateway: ${APP_GATEWAY}

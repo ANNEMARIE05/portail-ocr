@@ -2,8 +2,17 @@
 
 export type StatutUtilisateur = 'actif' | 'inactif' | 'suspendu'
 export type RoleAdmin = 'super-admin' | 'admin' | 'moderateur'
-export type StatutTransaction = 'complete' | 'en-attente' | 'echoue' | 'rembourse'
+export type StatutTransaction = 'succes' | 'echec'
 export type StatutDemande = 'en-attente' | 'approuve' | 'rejete'
+
+/** Entrée d'historique lorsqu'un administrateur assigne du quota à un client */
+export interface EntreeHistoriqueQuota {
+  id: string
+  utilisateurId: string
+  nomClient: string
+  montant: number
+  date: Date
+}
 
 export interface Utilisateur {
   id: string
@@ -11,6 +20,8 @@ export interface Utilisateur {
   prenom: string
   email: string
   entreprise: string
+  /** Rôle métier (ex. Utilisateur, Gestionnaire) */
+  role: string
   telephone: string
   dateInscription: Date
   derniereConnexion: Date
@@ -69,7 +80,20 @@ export interface CleApi {
   estActive: boolean
   permissions: string[]
   nombreRequetes: number
+  /** Erreurs API (4xx/5xx) sur la période affichée — optionnel pour les mocks */
+  nombreErreurs?: number
   derniereUtilisation?: Date
+}
+
+/** Une ligne du tableau admin « Gestion d'API » (agrégée par client). */
+export interface LigneClientGestionApi {
+  utilisateurId: string
+  nomClient: string
+  cleMasquee: string
+  statutActif: boolean
+  pourcentageUtilisation: number
+  nombreCles: number
+  cles: CleApi[]
 }
 
 export interface DemandeSuppressionCompte {
@@ -120,6 +144,14 @@ export interface StatistiquesGlobales {
   variationRevenus: number
   tauxConversion: number
   variationTauxConversion: number
+  /** Secondes, temps moyen de traitement OCR (plateforme) */
+  tempsMoyenTraitement: number
+  /** Pourcentage affiché (ex. 98.7) — même convention que le dashboard utilisateur */
+  precisionMoyenne: number
+  variationPrecision: number
+  /** Tickets support non résolus (ouverts + en cours) */
+  ticketsOuverts: number
+  variationTicketsOuverts: number
 }
 
 export interface DonneesGraphique {
@@ -168,6 +200,16 @@ export interface FiltresTransactions {
   dateFin?: Date
 }
 
+export interface FiltresAdministrateurs {
+  recherche?: string
+  role?: RoleAdmin | 'tous'
+  statutCompte?: 'tous' | 'actif' | 'inactif'
+}
+
+export interface FiltresDemandesSuppression {
+  recherche?: string
+}
+
 // Types pour les colonnes de table
 export interface ColonneTable<T> {
   id: keyof T | string
@@ -175,6 +217,8 @@ export interface ColonneTable<T> {
   accesseur: (item: T) => React.ReactNode
   triable?: boolean
   largeur?: string
+  /** Classes Tailwind sur la cellule (`td`), ex. `max-w-[…] min-w-0` pour une troncature. */
+  classNameCellule?: string
 }
 
 export interface ActionLigne<T> {

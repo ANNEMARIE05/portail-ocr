@@ -13,7 +13,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
 import Link from 'next/link'
 
 interface Breadcrumb {
@@ -24,12 +23,30 @@ interface Breadcrumb {
 const titresPages: Record<string, { titre: string; description: string }> = {
   '/admin': { titre: 'Tableau de bord', description: 'Vue d\'ensemble de votre plateforme OCR' },
   '/admin/tableau': { titre: 'Tableau de bord', description: 'Vue d\'ensemble de votre plateforme OCR' },
-  '/admin/utilisateurs': { titre: 'Utilisateurs', description: 'Gérez les comptes utilisateurs de la plateforme' },
-  '/admin/administrateurs': { titre: 'Administrateurs', description: 'Gérez les comptes administrateurs' },
-  '/admin/documents': { titre: 'Documents', description: 'Suivi des quotas et documents traités' },
-  '/admin/api': { titre: 'Clés API', description: 'Gestion des clés API et permissions' },
-  '/admin/transactions': { titre: 'Transactions', description: 'Historique des paiements et achats' },
-  '/admin/packs': { titre: 'Packs', description: 'Configuration des offres et tarifs' },
+  '/admin/utilisateurs': {
+    titre: 'Liste des utilisateurs',
+    description: 'Comptes clients — recherche, création et gestion.',
+  },
+  '/admin/administrateurs': {
+    titre: 'Liste des administrateurs',
+    description: 'Comptes avec accès à l\'administration.',
+  },
+  '/admin/documents': {
+    titre: 'Quotas par utilisateur',
+    description: 'Gérez les allocations de documents par client',
+  },
+  '/admin/api': {
+    titre: "Gestion d'API",
+    description: 'Vue par client : clés, statut et utilisation',
+  },
+  '/admin/transactions': {
+    titre: 'Historique des transactions',
+    description: 'Paiements et achats — recherche par référence ou libellé.',
+  },
+  '/admin/packs': {
+    titre: 'Packs',
+    description: 'Liste des packs — création et modification au besoin.',
+  },
   '/admin/demandes-suppression': { titre: 'Demandes de suppression', description: 'Traitement des demandes de suppression de compte' },
   '/admin/parametres': { titre: 'Paramètres', description: 'Configuration de la sécurité et des notifications' },
   '/admin/profil': { titre: 'Mon profil', description: 'Gérez vos informations personnelles' },
@@ -38,9 +55,10 @@ const titresPages: Record<string, { titre: string; description: string }> = {
 
 interface PropsHeaderAdmin {
   nombreNotifications?: number
+  onDeconnexion?: () => void
 }
 
-export function HeaderAdmin({ nombreNotifications = 0 }: PropsHeaderAdmin) {
+export function HeaderAdmin({ nombreNotifications = 0, onDeconnexion }: PropsHeaderAdmin) {
   const pathname = usePathname()
   const infosPage = titresPages[pathname] || { titre: 'Administration', description: '' }
 
@@ -135,7 +153,10 @@ export function HeaderAdmin({ nombreNotifications = 0 }: PropsHeaderAdmin) {
               <Link href="/admin/parametres">Paramètres</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-600 focus:text-red-600">
+            <DropdownMenuItem
+              className="text-red-600 focus:text-red-600 cursor-pointer"
+              onSelect={() => onDeconnexion?.()}
+            >
               Déconnexion
             </DropdownMenuItem>
           </DropdownMenuContent>

@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,8 @@ interface PropsModaleConfirmation {
   onConfirmer: () => void
   titre: string
   description: string
+  /** Contenu supplementaire entre la description et les boutons (ex. champs de formulaire). */
+  children?: ReactNode
   texteConfirmation?: string
   texteAnnulation?: string
   variante?: VarianteModale
@@ -33,6 +36,7 @@ export function ModaleConfirmation({
   onConfirmer,
   titre,
   description,
+  children,
   texteConfirmation = 'Confirmer',
   texteAnnulation = 'Annuler',
   variante = 'default',
@@ -45,6 +49,7 @@ export function ModaleConfirmation({
           <AlertDialogTitle>{titre}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {children}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={estChargement}>{texteAnnulation}</AlertDialogCancel>
           <AlertDialogAction

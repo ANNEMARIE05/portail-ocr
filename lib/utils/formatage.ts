@@ -24,19 +24,49 @@ export function formaterNombreAbrege(valeur: number): string {
 /**
  * Formate un montant en devise
  */
-export function formaterMontant(montant: number, devise: string = 'EUR'): string {
+export function formaterMontant(montant: number, devise: string = 'XOF'): string {
+  const code = devise ?? 'XOF'
+  const estFcfa = code.toUpperCase() === 'XOF'
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: devise,
+    currency: code,
+    currencyDisplay: 'code',
     minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: estFcfa ? 0 : 2,
   }).format(montant)
+}
+
+/** Parité officielle BCEAO : 1 EUR = 655,957 F CFA (XOF) */
+const TAUX_EUR_VERS_XOF = 655.957
+
+/**
+ * Convertit un montant vers le franc CFA (XOF). Si la devise est déjà XOF, retourne le montant arrondi.
+ */
+export function convertirMontantEnFcfa(montant: number, devise: string = 'XOF'): number {
+  const d = devise.toUpperCase()
+  if (d === 'XOF') return Math.round(montant)
+  if (d === 'EUR') return Math.round(montant * TAUX_EUR_VERS_XOF)
+  return Math.round(montant * TAUX_EUR_VERS_XOF)
+}
+
+/**
+ * Affiche un montant en XOF (format monétaire fr-FR, sans décimales, code ISO affiché).
+ */
+export function formaterMontantFcfa(montantFcfa: number): string {
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'XOF',
+    currencyDisplay: 'code',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(montantFcfa)
 }
 
 /**
  * Formate une date au format court (ex: 15 jan. 2024)
  */
 export function formaterDateCourte(date: Date): string {
+  if (!estDateValide(date)) return '—'
   return format(date, 'd MMM yyyy', { locale: fr })
 }
 
@@ -44,13 +74,33 @@ export function formaterDateCourte(date: Date): string {
  * Formate une date au format long (ex: 15 janvier 2024 à 14:30)
  */
 export function formaterDateLongue(date: Date): string {
+  if (!estDateValide(date)) return '—'
   return format(date, "d MMMM yyyy 'à' HH:mm", { locale: fr })
+}
+
+function estDateValide(date: Date): boolean {
+  return date instanceof Date && !Number.isNaN(date.getTime())
+}
+
+/**
+ * Date et heure compactes pour tableaux (ex: 23/04/2026 15:42)
+ */
+export function formaterDateHeure(date: Date): string {
+  if (!estDateValide(date)) return '—'
+  return format(date, 'dd/MM/yyyy HH:mm', { locale: fr })
+}
+
+/** Ex. 23/04/2026 15:49:11 */
+export function formaterDateHeureAvecSecondes(date: Date): string {
+  if (!estDateValide(date)) return '—'
+  return format(date, 'dd/MM/yyyy HH:mm:ss', { locale: fr })
 }
 
 /**
  * Formate une date relative (ex: il y a 2 heures)
  */
 export function formaterDateRelative(date: Date): string {
+  if (!estDateValide(date)) return '—'
   if (isToday(date)) {
     return `Aujourd'hui à ${format(date, 'HH:mm')}`
   }
@@ -86,8 +136,23 @@ export function tronquerTexte(texte: string, longueurMax: number): string {
 /**
  * Génère les initiales d'un nom
  */
+/** Découpe « Prénom Nom » : un seul mot → tout dans prenom, nom vide. */
+export function separerPrenomNom(chaine: string): { prenom: string; nom: string } {
+  const t = chaine.trim().replace(/\s+/g, ' ')
+  if (!t) return { prenom: '', nom: '' }
+  const i = t.indexOf(' ')
+  if (i === -1) return { prenom: t, nom: '' }
+  return { prenom: t.slice(0, i), nom: t.slice(i + 1).trim() }
+}
+
 export function genererInitiales(prenom: string, nom: string): string {
-  return `${prenom.charAt(0)}${nom.charAt(0)}`.toUpperCase()
+  const p = (prenom || '').trim()
+  const n = (nom || '').trim()
+  if (p && n) return `${p.charAt(0)}${n.charAt(0)}`.toUpperCase()
+  if (n.length >= 2) return `${n.charAt(0)}${n.charAt(1)}`.toUpperCase()
+  const seul = p || n
+  if (seul.length >= 1) return `${seul.charAt(0)}${seul.charAt(1) || seul.charAt(0)}`.toUpperCase()
+  return '?'
 }
 
 /**

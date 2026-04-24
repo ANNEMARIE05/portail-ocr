@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import type { StatutDemande, StatutTransaction } from '@/lib/types-admin'
 
 type TypeBadge = 'succes' | 'erreur' | 'attention' | 'info' | 'neutre'
 
@@ -38,12 +39,20 @@ export function BadgeStatutUtilisateur({ statut }: { statut: 'actif' | 'inactif'
   return <BadgeStatut type={type}>{label}</BadgeStatut>
 }
 
-export function BadgeStatutTransaction({ statut }: { statut: 'complete' | 'en-attente' | 'echoue' | 'rembourse' }) {
-  const config: Record<typeof statut, { type: TypeBadge; label: string }> = {
-    complete: { type: 'succes', label: 'Complète' },
+export function BadgeStatutTransaction({ statut }: { statut: StatutTransaction }) {
+  const config: Record<StatutTransaction, { type: TypeBadge; label: string }> = {
+    succes: { type: 'succes', label: 'Succès' },
+    echec: { type: 'erreur', label: 'Échec' },
+  }
+  const { type, label } = config[statut]
+  return <BadgeStatut type={type}>{label}</BadgeStatut>
+}
+
+export function BadgeStatutDemandeSuppression({ statut }: { statut: StatutDemande }) {
+  const config: Record<StatutDemande, { type: TypeBadge; label: string }> = {
     'en-attente': { type: 'attention', label: 'En attente' },
-    echoue: { type: 'erreur', label: 'Échouée' },
-    rembourse: { type: 'info', label: 'Remboursée' },
+    approuve: { type: 'succes', label: 'Approuvé' },
+    rejete: { type: 'neutre', label: 'Rejeté' },
   }
   const { type, label } = config[statut]
   return <BadgeStatut type={type}>{label}</BadgeStatut>

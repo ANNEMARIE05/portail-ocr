@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, RefreshCw, CheckCircle2, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { lire2faRequisAdmin, lire2faRequisUtilisateur } from '@/lib/mfa-preference'
 
 function ContenuOTP() {
   const router = useRouter()
@@ -23,23 +24,38 @@ function ContenuOTP() {
   const [tempsRestant, setTempsRestant] = useState(60)
   const [peutRenvoyer, setPeutRenvoyer] = useState(false)
   const [renvoyerEnCours, setRenvoyerEnCours] = useState(false)
+  const [peutSaisir, setPeutSaisir] = useState(false)
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
+  // Si le 2FA n’est plus exigé, rediriger sans montrer la page
+  useLayoutEffect(() => {
+    const requis = estAdmin
+      ? lire2faRequisAdmin()
+      : lire2faRequisUtilisateur()
+    if (!requis) {
+      router.replace(destination)
+      return
+    }
+    queueMicrotask(() => setPeutSaisir(true))
+  }, [estAdmin, destination, router])
+
   // Timer pour le renvoi de code
   useEffect(() => {
+    if (!peutSaisir) return
     if (tempsRestant > 0) {
       const timer = setTimeout(() => setTempsRestant(tempsRestant - 1), 1000)
       return () => clearTimeout(timer)
-    } else {
-      setPeutRenvoyer(true)
     }
-  }, [tempsRestant])
+    queueMicrotask(() => setPeutRenvoyer(true))
+  }, [tempsRestant, peutSaisir])
 
-  // Focus sur le premier champ au montage
+  // Focus sur le premier champ
   useEffect(() => {
-    inputRefs.current[0]?.focus()
-  }, [])
+    if (peutSaisir) {
+      inputRefs.current[0]?.focus()
+    }
+  }, [peutSaisir])
 
   const handleChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return
@@ -111,6 +127,26 @@ function ContenuOTP() {
     if (!domaine) return email
     const nomMasque = nom.slice(0, 2) + '***'
     return `${nomMasque}@${domaine}`
+  }
+
+  if (!peutSaisir) {
+    return (
+      <div
+        className={cn(
+          'min-h-screen flex items-center justify-center',
+          estAdmin
+            ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
+            : 'bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100'
+        )}
+      >
+        <Loader2
+          className={cn(
+            'h-8 w-8 animate-spin',
+            estAdmin ? 'text-blue-400' : 'text-blue-600'
+          )}
+        />
+      </div>
+    )
   }
 
   if (estVerifie) {

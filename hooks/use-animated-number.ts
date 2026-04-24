@@ -16,11 +16,19 @@ function easeOutExpo(t: number): number {
 /**
  * Hook qui anime une transition de nombre de 0 vers une valeur cible
  */
+function normaliserNombreCible(valeur: number | undefined | null): number {
+  if (typeof valeur !== 'number' || !Number.isFinite(valeur)) {
+    return 0
+  }
+  return valeur
+}
+
 export function useAnimatedNumber(
   valeurCible: number,
   options: OptionsAnimation = {}
 ): number {
   const { duree = 1500, delai = 0, easing = easeOutExpo } = options
+  const cible = normaliserNombreCible(valeurCible)
   const [valeurActuelle, setValeurActuelle] = useState(0)
   const animationRef = useRef<number | null>(null)
   const debutRef = useRef<number | null>(null)
@@ -30,6 +38,7 @@ export function useAnimatedNumber(
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current)
     }
+    debutRef.current = null
 
     const demarrerAnimation = () => {
       const animer = (timestamp: number) => {
@@ -38,14 +47,14 @@ export function useAnimatedNumber(
         }
 
         const progression = Math.min((timestamp - debutRef.current) / duree, 1)
-        const valeurAnimee = Math.floor(easing(progression) * valeurCible)
-        
+        const valeurAnimee = Math.floor(easing(progression) * cible)
+
         setValeurActuelle(valeurAnimee)
 
         if (progression < 1) {
           animationRef.current = requestAnimationFrame(animer)
         } else {
-          setValeurActuelle(valeurCible)
+          setValeurActuelle(cible)
         }
       }
 
@@ -69,7 +78,7 @@ export function useAnimatedNumber(
         cancelAnimationFrame(animationRef.current)
       }
     }
-  }, [valeurCible, duree, delai, easing])
+  }, [cible, duree, delai, easing])
 
   return valeurActuelle
 }
@@ -81,6 +90,7 @@ export function useAnimatedPercentage(
   valeurCible: number,
   options: OptionsAnimation = {}
 ): string {
-  const valeur = useAnimatedNumber(valeurCible * 10, options)
+  const ciblePct = normaliserNombreCible(valeurCible) * 10
+  const valeur = useAnimatedNumber(ciblePct, options)
   return (valeur / 10).toFixed(1).replace('.', ',')
 }

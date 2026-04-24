@@ -1,9 +1,10 @@
-import type { Utilisateur, Administrateur, DemandeSuppressionCompte, CleApi } from '@/lib/types-admin'
+import type { Utilisateur, Administrateur, DemandeSuppressionCompte, CleApi, RoleAdmin } from '@/lib/types-admin'
 
 const prenomsHommes = ['Thomas', 'Nicolas', 'Julien', 'Pierre', 'Antoine', 'Maxime', 'Alexandre', 'François', 'Guillaume', 'Sébastien', 'Mathieu', 'David', 'Laurent', 'Philippe', 'Christophe', 'Jean', 'Michel', 'Olivier', 'Frédéric', 'Éric']
 const prenomsFemmes = ['Marie', 'Sophie', 'Julie', 'Camille', 'Émilie', 'Céline', 'Nathalie', 'Aurélie', 'Isabelle', 'Caroline', 'Stéphanie', 'Valérie', 'Sandrine', 'Virginie', 'Claire', 'Anne', 'Catherine', 'Sylvie', 'Martine', 'Christine']
 const noms = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Richard', 'Petit', 'Durand', 'Leroy', 'Moreau', 'Simon', 'Laurent', 'Lefebvre', 'Michel', 'Garcia', 'David', 'Bertrand', 'Roux', 'Vincent', 'Fournier', 'Morel', 'Girard', 'André', 'Mercier', 'Dupont', 'Lambert', 'Bonnet', 'François', 'Martinez', 'Legrand', 'Garnier', 'Faure', 'Rousseau', 'Blanc', 'Guérin', 'Muller', 'Henry', 'Roussel', 'Nicolas', 'Perrin']
 const entreprises = ['TechSolutions SAS', 'Cabinet Médical Dr. ', 'Immobilier Plus', 'Assurances Mutuelles', 'Comptabilité Expert', 'Notaire Office', 'Architectes Associés', 'Cabinet Juridique', 'Banque Régionale', 'Pharmacie Centrale', 'Clinique Vétérinaire', 'Auto-École Conduite', 'Agence Voyage Plus', 'Restaurant Le Gourmet', 'Hôtel Grand Palace', 'Garage Mécanique Pro', 'Salon Beauté Élégance', 'Boulangerie Artisanale', 'Librairie Culturelle', 'Fleuriste Pétales']
+const rolesUtilisateur = ['Utilisateur', 'Gestionnaire', 'Comptable', 'Collaborateur']
 
 function genererDateAleatoire(debut: Date, fin: Date): Date {
   return new Date(debut.getTime() + Math.random() * (fin.getTime() - debut.getTime()))
@@ -48,6 +49,7 @@ export function genererUtilisateurs(nombre: number): Utilisateur[] {
     
     const quotaTotal = [100, 250, 500, 1000, 2500, 5000][Math.floor(Math.random() * 6)]
     const quotaUtilise = Math.floor(Math.random() * quotaTotal)
+    const role = rolesUtilisateur[Math.floor(Math.random() * rolesUtilisateur.length)]
 
     utilisateurs.push({
       id: `usr_${(i + 1).toString().padStart(5, '0')}`,
@@ -55,6 +57,7 @@ export function genererUtilisateurs(nombre: number): Utilisateur[] {
       prenom,
       email: genererEmail(prenom, nom, entreprise),
       entreprise,
+      role,
       telephone: genererTelephone(),
       dateInscription,
       derniereConnexion,
@@ -69,7 +72,7 @@ export function genererUtilisateurs(nombre: number): Utilisateur[] {
 
 export const utilisateursMock = genererUtilisateurs(67)
 
-export const administrateursMock: Administrateur[] = [
+const administrateursMockBase: Administrateur[] = [
   {
     id: 'adm_001',
     nom: 'Durand',
@@ -122,6 +125,32 @@ export const administrateursMock: Administrateur[] = [
   },
 ]
 
+function genererAdministrateursMockSupplementaires(): Administrateur[] {
+  const prenoms = [...prenomsHommes, ...prenomsFemmes]
+  const roles: RoleAdmin[] = ['admin', 'moderateur']
+  return Array.from({ length: 16 }).map((_, idx) => {
+    const i = idx + 6
+    const prenom = prenoms[idx % prenoms.length]
+    const nom = noms[(idx + 4) % noms.length]
+    const role = roles[idx % 2]
+    return {
+      id: `adm_${String(i).padStart(3, '0')}`,
+      prenom,
+      nom,
+      email: `equipe.${i}@ocrportal.fr`,
+      role,
+      dateCreation: new Date(2024, idx % 12, (idx % 27) + 1),
+      derniereActivite: new Date(Date.now() - idx * 7200000),
+      estActif: idx % 6 !== 0,
+    }
+  })
+}
+
+export const administrateursMock: Administrateur[] = [
+  ...administrateursMockBase,
+  ...genererAdministrateursMockSupplementaires(),
+]
+
 export const demandesSuppressionMock: DemandeSuppressionCompte[] = [
   {
     id: 'dem_001',
@@ -165,6 +194,13 @@ export const demandesSuppressionMock: DemandeSuppressionCompte[] = [
   },
 ]
 
+const ensemblesPermissions = [
+  ['lecture', 'ecriture', 'soumission'],
+  ['lecture', 'ecriture', 'suppression'],
+  ['lecture', 'ecriture'],
+  ['lecture', 'soumission'],
+] as const
+
 export const clesApiMock: CleApi[] = utilisateursMock.slice(0, 25).map((user, index) => ({
   id: `api_${(index + 1).toString().padStart(4, '0')}`,
   utilisateurId: user.id,
@@ -173,9 +209,22 @@ export const clesApiMock: CleApi[] = utilisateursMock.slice(0, 25).map((user, in
   dateCreation: genererDateAleatoire(user.dateInscription, new Date()),
   dateExpiration: new Date(Date.now() + 86400000 * (Math.floor(Math.random() * 365) + 30)),
   estActive: Math.random() > 0.15,
-  permissions: Math.random() > 0.5 
-    ? ['lecture', 'ecriture', 'suppression'] 
-    : ['lecture', 'ecriture'],
+  permissions: [...ensemblesPermissions[index % ensemblesPermissions.length]],
   nombreRequetes: Math.floor(Math.random() * 50000),
+  nombreErreurs: Math.floor(Math.random() * 120),
   derniereUtilisation: Math.random() > 0.3 ? genererDateAleatoire(new Date(Date.now() - 86400000 * 30), new Date()) : undefined,
 }))
+
+/** Démo : client « Yasmine » aligné sur la maquette (0 %, clé hex masquée, etc.) */
+if (clesApiMock[0]) {
+  const ref = clesApiMock[0]
+  ref.utilisateurNom = 'Yasmine Martin'
+  ref.cle = 'a787004fed9b42d8da0b1c2e3f4a5b6c7d8e9f0a1b2c3d4e5f67890abcdef'
+  ref.dateCreation = new Date('2026-04-23T10:00:00')
+  ref.dateExpiration = new Date('2027-04-23T23:59:59')
+  ref.estActive = true
+  ref.permissions = ['ecriture', 'lecture', 'soumission']
+  ref.nombreRequetes = 0
+  ref.nombreErreurs = 0
+  ref.derniereUtilisation = new Date('2026-04-23T15:49:11')
+}

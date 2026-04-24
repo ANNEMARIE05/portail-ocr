@@ -5,7 +5,7 @@ import { formaterNombre, formaterNombreAbrege, formaterMontant } from '@/lib/uti
 
 interface PropsCompteurAnime {
   valeur: number
-  format?: 'nombre' | 'abrege' | 'montant' | 'pourcentage'
+  format?: 'nombre' | 'abrege' | 'montant' | 'pourcentage' | 'duree'
   devise?: string
   duree?: number
   delai?: number
@@ -15,7 +15,7 @@ interface PropsCompteurAnime {
 export function CompteurAnime({
   valeur,
   format = 'nombre',
-  devise = 'EUR',
+  devise = 'XOF',
   duree = 1500,
   delai = 0,
   className,
@@ -30,6 +30,8 @@ export function CompteurAnime({
         return formaterMontant(valeurAnimee, devise)
       case 'pourcentage':
         return `${(valeurAnimee / 10).toFixed(1).replace('.', ',')}%`
+      case 'duree':
+        return `${valeurAnimee.toFixed(1).replace('.', ',')}\u00A0s`
       default:
         return formaterNombre(valeurAnimee)
     }

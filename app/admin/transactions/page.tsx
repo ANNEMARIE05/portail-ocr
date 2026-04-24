@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Eye, RotateCcw, Download, CreditCard, Receipt } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { RotateCcw, Download } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -11,21 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { TableDonnees } from '@/components/admin/data-table'
 import { ChampRecherche } from '@/components/admin/search-input'
 import { BadgeStatutTransaction } from '@/components/admin/status-badge'
 import { ChargeurPage } from '@/components/admin/page-loader'
-import { CarteStats } from '@/components/admin/stat-card'
 import { recupererTransactions } from '@/lib/api/admin-service'
-import { transactionsMock } from '@/lib/mock/donnees-transactions'
-import type { Transaction, ColonneTable, ActionLigne, ConfigPagination, StatutTransaction } from '@/lib/types-admin'
+import type { Transaction, ColonneTable, ConfigPagination } from '@/lib/types-admin'
 import { formaterDateCourte, formaterMontant, formaterDateLongue } from '@/lib/utils/formatage'
 
 export default function PageTransactions() {
@@ -33,27 +24,16 @@ export default function PageTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [pagination, setPagination] = useState<ConfigPagination>({ page: 1, parPage: 10, total: 0 })
   const [recherche, setRecherche] = useState('')
-  const [filtreStatut, setFiltreStatut] = useState<StatutTransaction | 'tous'>('tous')
-  
+
   // Modale détail
   const [transactionSelectionnee, setTransactionSelectionnee] = useState<Transaction | null>(null)
   const [modaleDetailOuverte, setModaleDetailOuverte] = useState(false)
-
-  // Statistiques calculées
-  const statsTransactions = {
-    total: transactionsMock.length,
-    completes: transactionsMock.filter((t) => t.statut === 'complete').length,
-    enAttente: transactionsMock.filter((t) => t.statut === 'en-attente').length,
-    montantTotal: transactionsMock
-      .filter((t) => t.statut === 'complete')
-      .reduce((acc, t) => acc + t.montant, 0),
-  }
 
   const chargerTransactions = useCallback(async () => {
     setEstChargement(true)
     const reponse = await recupererTransactions(pagination.page, pagination.parPage, {
       recherche,
-      statut: filtreStatut,
+      statut: 'tous',
     })
     
     if (reponse.succes && reponse.donnees) {
@@ -63,10 +43,12 @@ export default function PageTransactions() {
       }
     }
     setEstChargement(false)
-  }, [pagination.page, pagination.parPage, recherche, filtreStatut])
+  }, [pagination.page, pagination.parPage, recherche])
 
   useEffect(() => {
-    chargerTransactions()
+    queueMicrotask(() => {
+      void chargerTransactions()
+    })
   }, [chargerTransactions])
 
   const gererChangementPage = (nouvellePage: number) => {
@@ -80,16 +62,16 @@ export default function PageTransactions() {
 
   const colonnes: ColonneTable<Transaction>[] = [
     {
-      id: 'reference',
-      label: 'Référence',
-      largeur: '140px',
+      id: 'date',
+      label: 'Date',
+      largeur: '120px',
       accesseur: (t) => (
-        <span className="font-mono text-sm font-medium text-foreground">{t.reference}</span>
+        <span className="text-sm text-muted-foreground">{formaterDateCourte(t.dateTransaction)}</span>
       ),
     },
     {
       id: 'utilisateur',
-      label: 'Client',
+      label: 'Utilisateur',
       accesseur: (t) => (
         <div className="flex flex-col">
           <span className="font-medium text-foreground">{t.utilisateurNom}</span>
@@ -98,14 +80,14 @@ export default function PageTransactions() {
       ),
     },
     {
-      id: 'pack',
-      label: 'Pack',
-      largeur: '120px',
-      accesseur: (t) => <span className="text-sm">{t.packNom}</span>,
+      id: 'methodePaiement',
+      label: 'Méthode de paiement',
+      largeur: '140px',
+      accesseur: (t) => <span className="text-sm text-muted-foreground">{t.methodePaiement}</span>,
     },
     {
       id: 'montant',
-      label: 'Montant',
+      label: 'Montant (XOF)',
       largeur: '100px',
       accesseur: (t) => (
         <span className="font-medium text-foreground">{formaterMontant(t.montant, t.devise)}</span>
@@ -118,124 +100,54 @@ export default function PageTransactions() {
       accesseur: (t) => <BadgeStatutTransaction statut={t.statut} />,
     },
     {
-      id: 'date',
-      label: 'Date',
-      largeur: '120px',
+      id: 'reference',
+      label: 'Référence',
+      largeur: '140px',
       accesseur: (t) => (
-        <span className="text-sm text-muted-foreground">{formaterDateCourte(t.dateTransaction)}</span>
+        <span className="font-mono text-sm font-medium text-foreground">{t.reference}</span>
       ),
     },
   ]
 
-  const actions: ActionLigne<Transaction>[] = [
-    {
-      id: 'voir',
-      label: 'Voir le détail',
-      icone: Eye,
-      onClick: (t) => {
-        setTransactionSelectionnee(t)
-        setModaleDetailOuverte(true)
-      },
-    },
-    {
-      id: 'rembourser',
-      label: 'Rembourser',
-      icone: RotateCcw,
-      onClick: (t) => {
-        // Action de remboursement
-      },
-      condition: (t) => t.statut === 'complete',
-    },
-    {
-      id: 'telecharger',
-      label: 'Télécharger facture',
-      icone: Download,
-      onClick: (t) => {
-        // Téléchargement facture
-      },
-      condition: (t) => t.statut === 'complete',
-    },
-  ]
-
   if (estChargement && transactions.length === 0) {
-    return <ChargeurPage avecCartes={4} avecTable />
+    return <ChargeurPage avecTable />
   }
 
   return (
     <div className="space-y-6">
-      {/* Statistiques */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <CarteStats
-          titre="Total transactions"
-          valeur={statsTransactions.total}
-          icone={Receipt}
-          couleur="bleu"
-          delaiAnimation={0}
-        />
-        <CarteStats
-          titre="Complétées"
-          valeur={statsTransactions.completes}
-          icone={CreditCard}
-          couleur="vert"
-          delaiAnimation={100}
-        />
-        <CarteStats
-          titre="En attente"
-          valeur={statsTransactions.enAttente}
-          icone={Receipt}
-          couleur="orange"
-          delaiAnimation={200}
-        />
-        <CarteStats
-          titre="Montant total"
-          valeur={statsTransactions.montantTotal}
-          format="montant"
-          icone={CreditCard}
-          couleur="violet"
-          delaiAnimation={300}
-        />
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <div className="min-w-0 flex-1 space-y-1">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">Historique des transactions</h2>
+          <p className="text-sm text-muted-foreground">Paiements et achats — recherche par référence ou libellé.</p>
+        </div>
       </div>
 
-      {/* Liste des transactions */}
       <Card className="border-border/40 shadow-sm">
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-base font-semibold">Historique des transactions</CardTitle>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Select
-              value={filtreStatut}
-              onValueChange={(val) => {
-                setFiltreStatut(val as StatutTransaction | 'tous')
-                setPagination((prev) => ({ ...prev, page: 1 }))
-              }}
-            >
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Statut" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tous">Tous les statuts</SelectItem>
-                <SelectItem value="complete">Complétées</SelectItem>
-                <SelectItem value="en-attente">En attente</SelectItem>
-                <SelectItem value="echoue">Échouées</SelectItem>
-                <SelectItem value="rembourse">Remboursées</SelectItem>
-              </SelectContent>
-            </Select>
-            <ChampRecherche
-              placeholder="Rechercher une transaction..."
-              valeur={recherche}
-              onChange={gererRecherche}
-              className="w-full sm:w-64"
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <TableDonnees
             colonnes={colonnes}
             donnees={transactions}
             estChargement={estChargement}
             pagination={pagination}
             onChangementPage={gererChangementPage}
-            actions={actions}
+            onChangementParPage={(parPage) =>
+              setPagination((prev) => ({ ...prev, parPage, page: 1 }))
+            }
+            selectParPageAuDessusDuTableau
+            aCoteSelectParPage={
+              <ChampRecherche
+                placeholder="Rechercher une transaction..."
+                valeur={recherche}
+                onChange={gererRecherche}
+                className="min-w-0 w-full flex-1 sm:min-w-[220px] sm:max-w-md"
+              />
+            }
             idAccesseur={(t) => t.id}
+            onLigneClick={(t) => {
+              setTransactionSelectionnee(t)
+              setModaleDetailOuverte(true)
+            }}
+            lignesParPageSkeleton={pagination.parPage}
           />
         </CardContent>
       </Card>
@@ -281,7 +193,7 @@ export default function PageTransactions() {
                 </div>
               </div>
 
-              {transactionSelectionnee.statut === 'complete' && (
+              {transactionSelectionnee.statut === 'succes' && (
                 <div className="flex gap-3">
                   <Button variant="outline" className="flex-1">
                     <Download className="mr-2 h-4 w-4" />
