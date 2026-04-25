@@ -24,7 +24,7 @@ export function ChargeurPage({
 
       {/* Cartes de statistiques */}
       {avecCartes > 0 && (
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 lg:grid-cols-4">
           {Array.from({ length: avecCartes }).map((_, i) => (
             <Card key={i} className="h-full border-border/40 shadow-sm">
               <CardContent className="flex flex-col gap-1 p-3">

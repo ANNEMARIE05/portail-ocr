@@ -80,7 +80,7 @@ export interface CleApi {
   estActive: boolean
   permissions: string[]
   nombreRequetes: number
-  /** Erreurs API (4xx/5xx) sur la période affichée — optionnel pour les mocks */
+  /** Erreurs API (4xx/5xx) sur la période affichée — optionnel */
   nombreErreurs?: number
   derniereUtilisation?: Date
 }
@@ -114,6 +114,8 @@ export interface TicketSupport {
   utilisateurNom: string
   utilisateurEmail: string
   sujet: string
+  /** Texte initial du ticket (API) — affiché dans le fil si aucun message distinct. */
+  description?: string
   dateCreation: Date
   dernierMessage: Date
   statut: 'ouvert' | 'en-cours' | 'resolu' | 'ferme'

@@ -13,67 +13,66 @@ import type {
   OptionsListeTickets,
   ResultatDemandeSuppressionCompte,
 } from '@/lib/types-user'
-import { simulerDelai } from '@/lib/utils/delai'
+import { estBackendFacturationConfigure, estBackendUtilisateurConfigure } from '@/lib/api/env-backend'
+import * as userBackend from '@/lib/api/user-backend'
+import { ticketsApiCreer } from '@/lib/api/tickets-api'
 import {
-  statistiquesUser,
-  documentsRecentsMock,
-  historiqueAppelsMock,
-  transactionsUserMock,
-  packsDisponiblesMock,
-  clesApiUserMock,
-  ticketsSupportUserMock,
-  notificationsUserMock,
-} from '@/lib/mock/donnees-user'
+  extraireParametresRetourPaiement,
+  statutDepuisParametreUrl,
+  type StatutRecuPaiement,
+} from '@/lib/paiement-recu-retour'
+function backendUserActif(): boolean {
+  return estBackendUtilisateurConfigure()
+}
+
+function statistiquesUserVides(): StatistiquesUser {
+  return {
+    creditsRestants: 0,
+    creditsUtilises: 0,
+    creditsTotal: 0,
+    documentsTraites: 0,
+    documentsJour: 0,
+    variationDocuments: 0,
+    precisionMoyenne: 0,
+    tempsMoyenTraitement: 0,
+    appelApiMois: 0,
+  }
+}
 
 // ==================== STATISTIQUES ====================
 
 export async function recupererStatistiquesUser(): Promise<ReponseApiUser<StatistiquesUser>> {
-  await simulerDelai(400)
+  if (backendUserActif()) {
+    const api = await userBackend.tryRecupererStatistiquesUser()
+    if (api) return api
+  }
   return {
     succes: true,
-    donnees: statistiquesUser,
+    donnees: statistiquesUserVides(),
   }
 }
 
 // ==================== DOCUMENTS ====================
 
 export async function recupererDocumentsRecents(limite: number = 10): Promise<ReponseApiUser<DocumentOCR[]>> {
-  await simulerDelai(500)
+  void limite
   return {
     succes: true,
-    donnees: documentsRecentsMock.slice(0, limite),
+    donnees: [],
   }
 }
 
 export async function recupererDocumentParId(id: string): Promise<ReponseApiUser<DocumentOCR>> {
-  await simulerDelai(300)
-  const document = documentsRecentsMock.find(d => d.id === id)
-  
-  if (!document) {
-    return { succes: false, erreur: 'Document non trouve' }
-  }
-  
-  return { succes: true, donnees: document }
+  void id
+  return { succes: false, erreur: 'Document non trouve' }
 }
 
 export async function soumettreDocument(fichier: File): Promise<ReponseApiUser<DocumentOCR>> {
-  await simulerDelai(2000)
-  
-  // Simulation d'un nouveau document
-  const nouveauDocument: DocumentOCR = {
-    id: `doc_${Date.now()}`,
-    nomFichier: fichier.name,
-    typeFichier: fichier.type.includes('pdf') ? 'pdf' : 'image',
-    tailleFichier: fichier.size,
-    dateTraitement: new Date(),
-    statut: 'termine',
-    texteExtrait: 'Texte extrait du document...',
-    nombrePages: 1,
-    tempsTraitement: 1.5,
-    precision: 98.5,
+  if (backendUserActif()) {
+    const api = await userBackend.trySoumettreDocument([fichier])
+    if (api) return api
   }
-  
-  return { succes: true, donnees: nouveauDocument }
+  return { succes: false, erreur: 'API utilisateur non configuree ou indisponible.' }
 }
 
 // ==================== HISTORIQUE ====================
@@ -101,19 +100,30 @@ export async function recupererHistoriqueAppels(
   parPage: number = 10,
   options?: OptionsListeHistorique,
 ): Promise<ReponseApiUser<HistoriqueAppel[]>> {
-  await simulerDelai(400)
-
-  const filtree = filtrerHistoriqueAppels(historiqueAppelsMock, options)
-  const total = filtree.length
-  const debut = (page - 1) * parPage
-
+  if (backendUserActif()) {
+    const api = await userBackend.tryRecupererHistoriqueAppels(page, parPage)
+    if (api && api.succes && api.donnees != null) {
+      let donnees = api.donnees
+      if (options?.recherche?.trim() || (options?.statutHttp && options.statutHttp !== 'tous')) {
+        donnees = filtrerHistoriqueAppels(donnees, options)
+        const total = donnees.length
+        const debut = (page - 1) * parPage
+        return {
+          succes: true,
+          donnees: donnees.slice(debut, debut + parPage),
+          pagination: { page, parPage, total },
+        }
+      }
+      return api
+    }
+  }
   return {
     succes: true,
-    donnees: filtree.slice(debut, debut + parPage),
+    donnees: [],
     pagination: {
       page,
       parPage,
-      total,
+      total: 0,
     },
   }
 }
@@ -142,19 +152,100 @@ export async function recupererTransactionsUser(
   parPage: number = 10,
   options?: OptionsListeTransactions,
 ): Promise<ReponseApiUser<TransactionUser[]>> {
-  await simulerDelai(400)
-
-  const filtree = filtrerTransactions(transactionsUserMock, options)
-  const total = filtree.length
-  const debut = (page - 1) * parPage
-
+  if (estBackendFacturationConfigure() && backendUserActif()) {
+    const api = await userBackend.tryRecupererTransactionsUser(page, parPage)
+    if (api && api.succes && api.donnees != null) {
+      let donnees = api.donnees
+      if (options?.recherche?.trim() || (options?.statut && options.statut !== 'tous')) {
+        donnees = filtrerTransactions(donnees, options)
+        const total = donnees.length
+        const debut = (page - 1) * parPage
+        return {
+          succes: true,
+          donnees: donnees.slice(debut, debut + parPage),
+          pagination: { page, parPage, total },
+        }
+      }
+      return api
+    }
+  }
   return {
     succes: true,
-    donnees: filtree.slice(debut, debut + parPage),
+    donnees: [],
     pagination: {
       page,
       parPage,
-      total,
+      total: 0,
+    },
+  }
+}
+
+/** Reçu affiché après retour de la passerelle de paiement (`/user/achats/retour`). */
+export interface DonneesRecuPaiement {
+  statut: StatutRecuPaiement
+  libelleStatut: string
+  transaction: TransactionUser | null
+  creditsTotal: number
+  creditsUtilises: number
+  creditsRestants: number
+}
+
+function libelleStatutRecu(statut: StatutRecuPaiement): string {
+  switch (statut) {
+    case 'succes':
+      return 'Paiement réussi'
+    case 'echec':
+      return 'Paiement non finalisé ou refusé'
+    case 'en-attente':
+      return 'Paiement en cours de traitement'
+    default:
+      return 'Statut non communiqué par la passerelle'
+  }
+}
+
+/**
+ * Charge quota à jour + transaction éventuelle à partir des query params du retour paiement.
+ */
+export async function chargerRecuRetourPaiement(
+  sp: URLSearchParams,
+): Promise<{ succes: true; donnees: DonneesRecuPaiement } | { succes: false; erreur: string }> {
+  const params = extraireParametresRetourPaiement(sp)
+  const [statsRep, trxRep] = await Promise.all([
+    recupererStatistiquesUser(),
+    recupererTransactionsUser(1, 500),
+  ])
+
+  if (!statsRep.succes || !statsRep.donnees) {
+    return { succes: false, erreur: statsRep.erreur ?? 'Impossible de charger votre quota.' }
+  }
+
+  const s = statsRep.donnees
+  let transaction: TransactionUser | null = null
+  if (trxRep.succes && trxRep.donnees?.length) {
+    const idLc = params.idTransaction?.toLowerCase()
+    const refLc = params.reference?.toLowerCase()
+    transaction =
+      trxRep.donnees.find((t) => {
+        if (idLc && (t.id.toLowerCase() === idLc || t.reference.toLowerCase() === idLc)) return true
+        if (refLc && (t.reference.toLowerCase() === refLc || t.id.toLowerCase() === refLc)) return true
+        return false
+      }) ?? null
+  }
+
+  let statut: StatutRecuPaiement = statutDepuisParametreUrl(params.statutBrut)
+  if (transaction) {
+    statut = transaction.statut === 'succes' ? 'succes' : 'echec'
+  }
+
+  return {
+    succes: true,
+    donnees: {
+      statut,
+      libelleStatut: libelleStatutRecu(statut),
+      transaction,
+      creditsTotal: s.creditsTotal,
+      creditsUtilises: s.creditsUtilises,
+      creditsRestants: s.creditsRestants,
     },
   }
 }
@@ -162,130 +253,78 @@ export async function recupererTransactionsUser(
 // ==================== PACKS ====================
 
 export async function recupererPacksDisponibles(): Promise<ReponseApiUser<PackDisponible[]>> {
-  await simulerDelai(400)
+  if (estBackendFacturationConfigure()) {
+    const api = await userBackend.tryRecupererPacksDisponibles()
+    if (api) return api
+  }
   return {
     succes: true,
-    donnees: packsDisponiblesMock,
+    donnees: [],
   }
 }
 
-export async function acheterPack(packId: string): Promise<ReponseApiUser<TransactionUser>> {
-  await simulerDelai(1500)
-  
-  const pack = packsDisponiblesMock.find(p => p.id === packId)
-  if (!pack) {
-    return { succes: false, erreur: 'Pack non trouve' }
+export type ResultatAcheterPack = ReponseApiUser<TransactionUser> & {
+  urlPaiement?: string
+}
+
+export async function acheterPack(packId: string): Promise<ResultatAcheterPack> {
+  if (estBackendFacturationConfigure() && backendUserActif()) {
+    const api = await userBackend.tryAcheterPack(packId)
+    if (api && !api.succes) return { succes: false, erreur: api.erreur }
+    if (api && api.succes && api.donnees) {
+      return { succes: true, donnees: api.donnees, urlPaiement: api.urlPaiement }
+    }
   }
-  
-  const transaction: TransactionUser = {
-    id: `trx_${Date.now()}`,
-    reference: `PAY-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
-    packNom: pack.nom,
-    montant: pack.prix,
-    devise: pack.devise,
-    credits: pack.credits,
-    dateTransaction: new Date(),
-    statut: 'succes',
-    methodePaiement: 'Carte bancaire',
-  }
-  
-  return { succes: true, donnees: transaction }
+  return { succes: false, erreur: 'API facturation ou utilisateur non configuree.' }
 }
 
 // ==================== CLES API ====================
 
 export async function recupererClesApiUser(): Promise<ReponseApiUser<CleApiUser[]>> {
-  await simulerDelai(400)
-
+  if (backendUserActif()) {
+    const api = await userBackend.tryRecupererClesApiUser()
+    if (api) return api
+  }
   return {
     succes: true,
-    donnees: [...clesApiUserMock],
+    donnees: [],
   }
 }
 
 export async function creerCleApi(nom: string, permissions: string[]): Promise<ReponseApiUser<CleApiUser>> {
-  await simulerDelai(500)
-  
-  const nouvelleCle: CleApiUser = {
-    id: `key_${Date.now()}`,
-    cle: `ocr_live_sk_${Math.random().toString(36).substring(2, 30)}`,
-    nom,
-    dateCreation: new Date(),
-    dateExpiration: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-    estActive: true,
-    permissions,
-    nombreRequetes: 0,
-  }
-  
-  return { succes: true, donnees: nouvelleCle }
+  void nom
+  void permissions
+  return { succes: false, erreur: 'Creation de cle non disponible sans API utilisateur.' }
 }
 
 export async function revoquerCleApiUser(id: string): Promise<ReponseApiUser<CleApiUser>> {
-  await simulerDelai(300)
-  
-  const cle = clesApiUserMock.find(c => c.id === id)
-  if (!cle) {
-    return { succes: false, erreur: 'Cle API non trouvee' }
-  }
-  
-  cle.estActive = false
-  return { succes: true, donnees: cle }
+  void id
+  return { succes: false, erreur: 'Revocation de cle non disponible sans API utilisateur.' }
 }
 
 export async function regenererCleApiUser(id: string): Promise<ReponseApiUser<CleApiUser>> {
-  await simulerDelai(500)
-
-  const cle = clesApiUserMock.find((c) => c.id === id)
-  if (!cle) {
-    return { succes: false, erreur: 'Cle API non trouvee' }
+  if (backendUserActif()) {
+    const api = await userBackend.tryRegenererCleApiUser(id)
+    if (api) return api
   }
-  if (!cle.estActive) {
-    return { succes: false, erreur: 'Impossible de regenerer une cle inactive' }
-  }
-
-  const estTest = cle.cle.includes('ocr_test')
-  const suffixe = `${Math.random().toString(36).slice(2, 18)}${Math.random().toString(36).slice(2, 18)}`
-  cle.cle = estTest ? `ocr_test_sk_${suffixe}` : `ocr_live_sk_${suffixe}`
-
-  return { succes: true, donnees: { ...cle } }
+  return { succes: false, erreur: 'Regeneration de cle non disponible sans API utilisateur.' }
 }
 
 // ==================== SUPPORT ====================
-
-function filtrerTickets(liste: TicketSupportUser[], options?: OptionsListeTickets): TicketSupportUser[] {
-  let out = [...liste]
-  const q = options?.recherche?.trim().toLowerCase() ?? ''
-  if (q) {
-    out = out.filter(
-      (t) =>
-        t.sujet.toLowerCase().includes(q) ||
-        t.message.toLowerCase().includes(q) ||
-        t.id.toLowerCase().includes(q),
-    )
-  }
-  const st = options?.statut ?? 'tous'
-  if (st !== 'tous') out = out.filter((t) => t.statut === st)
-  return out
-}
 
 export async function recupererTicketsUser(
   page: number = 1,
   parPage: number = 10,
   options?: OptionsListeTickets,
 ): Promise<ReponseApiUser<TicketSupportUser[]>> {
-  await simulerDelai(400)
-
-  const filtree = filtrerTickets(ticketsSupportUserMock, options)
-  const total = filtree.length
-  const debut = (page - 1) * parPage
-
+  void options
   return {
     succes: true,
-    donnees: filtree.slice(debut, debut + parPage),
+    donnees: [],
     pagination: {
       page,
       parPage,
-      total,
+      total: 0,
     },
   }
 }
@@ -293,46 +332,34 @@ export async function recupererTicketsUser(
 export async function creerTicketSupport(
   sujet: string,
   message: string,
-  priorite: 'basse' | 'normale' | 'haute'
+  priorite: 'basse' | 'normale' | 'haute',
 ): Promise<ReponseApiUser<TicketSupportUser>> {
-  await simulerDelai(500)
-
-  const ticket: TicketSupportUser = {
-    id: `ticket_${Date.now()}`,
-    sujet,
-    message,
-    dateCreation: new Date(),
-    statut: 'ouvert',
-    priorite,
-    nombreReponses: 0,
-    statutBrutApi: 'OPEN',
+  void priorite
+  if (!backendUserActif()) {
+    return {
+      succes: false,
+      erreur: "API tickets non configuree (URL d'API et prefixe service utilisateur).",
+    }
   }
-
-  ticketsSupportUserMock.unshift(ticket)
-
-  return { succes: true, donnees: ticket }
+  const r = await ticketsApiCreer(sujet, message)
+  if (!r.ok || !r.ticket) {
+    return { succes: false, erreur: r.erreur ?? 'Creation du ticket impossible.' }
+  }
+  return { succes: true, donnees: r.ticket }
 }
 
 // ==================== NOTIFICATIONS ====================
 
 export async function recupererNotificationsUser(): Promise<ReponseApiUser<NotificationUser[]>> {
-  await simulerDelai(200)
   return {
     succes: true,
-    donnees: notificationsUserMock,
+    donnees: [],
   }
 }
 
 export async function marquerNotificationLue(id: string): Promise<ReponseApiUser<NotificationUser>> {
-  await simulerDelai(100)
-  
-  const notification = notificationsUserMock.find(n => n.id === id)
-  if (!notification) {
-    return { succes: false, erreur: 'Notification non trouvee' }
-  }
-  
-  notification.estLue = true
-  return { succes: true, donnees: notification }
+  void id
+  return { succes: false, erreur: 'Notification non trouvee' }
 }
 
 // ==================== COMPTE ====================
@@ -352,12 +379,10 @@ export async function demanderSuppressionCompte(
     }
   }
 
-  await simulerDelai(900)
-  return {
-    succes: true,
-    donnees: {
-      idDemande: `suppr_${Date.now()}`,
-      dateEnregistrement: new Date(),
-    },
+  if (backendUserActif()) {
+    const api = await userBackend.tryDemanderSuppressionCompte(motifTrim)
+    if (api) return api
   }
+
+  return { succes: false, erreur: 'API utilisateur non configuree ou indisponible.' }
 }

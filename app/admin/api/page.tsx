@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Copy, RotateCcw, Ban, Check, Eye, EyeOff, PanelRight, Loader2 } from 'lucide-react'
+import { Copy, RotateCcw, Ban, Check, Eye, EyeOff, Key, PanelRight, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -192,7 +192,8 @@ export default function PageApi() {
       label: 'Clés API',
       largeur: '100px',
       accesseur: (l) => (
-        <Badge variant="secondary" className="tabular-nums">
+        <Badge variant="secondary" className="inline-flex items-center gap-1.5 tabular-nums">
+          <Key className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
           {l.nombreCles}
         </Badge>
       ),

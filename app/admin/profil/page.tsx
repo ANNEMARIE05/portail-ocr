@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { User, Phone, Shield, Key, Save, Camera } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { User, Shield, Key, Camera } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,63 +9,102 @@ import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Spinner } from '@/components/ui/spinner'
 import { BadgeRole } from '@/components/admin/status-badge'
+import { useAdminProfil } from '@/components/admin/admin-profil-provider'
+import { lire2faRequisAdmin } from '@/lib/mfa-preference'
+import { changerMotDePasseAdminConnecte } from '@/lib/api/auth-api'
+import { estBackendAdminConfigure } from '@/lib/api/env-backend'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
-/** Aperçu fixe (non lié aux champs du formulaire) */
-const PROFIL_CARTE = {
-  prenom: 'Jean-Pierre',
-  nom: 'Durand',
-  email: 'jp.durand@ocrportal.fr',
-  telephone: '06 12 34 56 78',
-  role: 'super-admin' as const,
+function texteOuInconnu(v: string | null | undefined): string {
+  const t = typeof v === 'string' ? v.trim() : ''
+  return t || 'inconnu'
+}
+
+function ligneTelephoneAffichee(
+  indicatif: string | null | undefined,
+  numero: string | null | undefined,
+): string {
+  const n = typeof numero === 'string' ? numero.trim() : ''
+  if (!n) return 'inconnu'
+  const ind = typeof indicatif === 'string' ? indicatif.trim() : ''
+  return ind ? `+${ind} ${n}` : n
 }
 
 export default function PageProfil() {
-  const [estEnregistrement, setEstEnregistrement] = useState(false)
+  const { donnees: profil, estChargement } = useAdminProfil()
   const [estChangementMdp, setEstChangementMdp] = useState(false)
-  
-  // Données du profil (simulées)
-  const [profil, setProfil] = useState({
-    prenom: 'Jean-Pierre',
-    nom: 'Durand',
-    email: 'jp.durand@ocrportal.fr',
-    telephone: '06 12 34 56 78',
-    role: 'super-admin' as const,
-  })
+
+  const titreCarte = useMemo(() => {
+    const libelle = (profil.nom || '').trim()
+    if (libelle) return libelle
+    if (profil.email) return profil.email
+    return 'Profil administrateur'
+  }, [profil.nom, profil.email])
+
+  const deuxFacteursAffiche =
+    profil.twoFactorDepuisApi !== null ? profil.twoFactorDepuisApi : lire2faRequisAdmin()
 
   const [motsDePasse, setMotsDePasse] = useState({
     actuel: '',
     nouveau: '',
     confirmation: '',
   })
-
-  const enregistrerProfil = async () => {
-    setEstEnregistrement(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setEstEnregistrement(false)
-  }
+  const [erreurMotDePasse, setErreurMotDePasse] = useState<string | null>(null)
+  const [succesMotDePasse, setSuccesMotDePasse] = useState<string | null>(null)
 
   const changerMotDePasse = async () => {
+    setErreurMotDePasse(null)
+    setSuccesMotDePasse(null)
     if (motsDePasse.nouveau !== motsDePasse.confirmation) {
+      setErreurMotDePasse('Les mots de passe ne correspondent pas.')
+      return
+    }
+    if (motsDePasse.nouveau.length < 8) {
+      setErreurMotDePasse('Le nouveau mot de passe doit contenir au moins 8 caractères.')
+      return
+    }
+    if (!estBackendAdminConfigure()) {
+      setErreurMotDePasse(
+        'API administrateur non configurée (NEXT_PUBLIC_API_*). Le changement de mot de passe requiert le backend.',
+      )
       return
     }
     setEstChangementMdp(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setMotsDePasse({ actuel: '', nouveau: '', confirmation: '' })
-    setEstChangementMdp(false)
+    try {
+      const res = await changerMotDePasseAdminConnecte({
+        motDePasseActuel: motsDePasse.actuel,
+        nouveauMotDePasse: motsDePasse.nouveau,
+        confirmerMotDePasse: motsDePasse.confirmation,
+      })
+      if (!res.ok) {
+        setErreurMotDePasse(res.erreur ?? 'Changement impossible.')
+        return
+      }
+      setSuccesMotDePasse('Mot de passe mis à jour.')
+      setMotsDePasse({ actuel: '', nouveau: '', confirmation: '' })
+    } finally {
+      setEstChangementMdp(false)
+    }
+  }
+
+  if (estChargement) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Spinner className="h-8 w-8" />
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Carte profil : aperçu statique, compact, reste visible au défilement */}
         <div className="shrink-0 self-start lg:sticky lg:top-20 lg:z-10 lg:col-span-1">
           <Card className="border-border/40 shadow-sm overflow-visible">
             <CardContent className="flex flex-col items-center p-4">
               <div className="relative">
                 <Avatar className="h-14 w-14">
                   <AvatarFallback className="bg-slate-900 text-sm text-white">
-                    {PROFIL_CARTE.prenom[0]}
-                    {PROFIL_CARTE.nom[0]}
+                    {profil.initialesAvatar}
                   </AvatarFallback>
                 </Avatar>
                 <button
@@ -77,34 +116,41 @@ export default function PageProfil() {
                 </button>
               </div>
 
-              <h2 className="mt-2 text-center text-sm font-semibold text-foreground">
-                {PROFIL_CARTE.prenom} {PROFIL_CARTE.nom}
-              </h2>
+              <h2 className="mt-2 text-center text-sm font-semibold text-foreground">{titreCarte}</h2>
               <p className="mt-0.5 max-w-full truncate px-1 text-center text-xs text-muted-foreground">
-                {PROFIL_CARTE.email}
+                {profil.email || '—'}
               </p>
 
+              <dl className="mt-2 w-full space-y-1 border-t border-border/40 pt-2 text-left text-xs">
+                <div className="flex items-baseline justify-between gap-2">
+                  <dt className="shrink-0 text-muted-foreground">Nom</dt>
+                  <dd className="truncate font-medium text-foreground">{texteOuInconnu(profil.nom)}</dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <dt className="shrink-0 text-muted-foreground">Téléphone</dt>
+                  <dd className="truncate font-medium text-foreground">
+                    {ligneTelephoneAffichee(profil.indicatifPays, profil.telephone)}
+                  </dd>
+                </div>
+              </dl>
+
               <div className="mt-2 scale-90">
-                <BadgeRole role={PROFIL_CARTE.role} />
+                <BadgeRole role={profil.role} />
               </div>
 
               <div className="mt-3 w-full space-y-2 border-t border-border/40 pt-3">
                 <div className="flex items-center gap-2 text-xs">
-                  <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <span className="truncate text-muted-foreground">{PROFIL_CARTE.telephone}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
                   <Shield className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <span className="text-muted-foreground">2FA activé</span>
+                  <span className="text-muted-foreground">
+                    {deuxFacteursAffiche ? '2FA activé' : '2FA désactivé'}
+                  </span>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Formulaires */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Informations personnelles */}
           <Card className="border-border/40 shadow-sm">
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -113,63 +159,66 @@ export default function PageProfil() {
                 </div>
                 <div>
                   <CardTitle className="text-base">Informations personnelles</CardTitle>
-                  <CardDescription>Modifiez vos informations de profil</CardDescription>
+                  <CardDescription>
+                    Données de votre compte (lecture seule, saisie désactivée)
+                  </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="prenom">Prénom</Label>
-                  <Input
-                    id="prenom"
-                    value={profil.prenom}
-                    onChange={(e) => setProfil({ ...profil, prenom: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="nom">Nom</Label>
-                  <Input
-                    id="nom"
-                    value={profil.nom}
-                    onChange={(e) => setProfil({ ...profil, nom: e.target.value })}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="nom">Nom</Label>
+                <Input
+                  id="nom"
+                  readOnly
+                  autoComplete="family-name"
+                  placeholder="inconnu"
+                  value={profil.nom}
+                  className="cursor-default bg-muted/40"
+                />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">E-mail</Label>
                 <Input
                   id="email"
+                  readOnly
                   type="email"
+                  autoComplete="email"
                   value={profil.email}
-                  onChange={(e) => setProfil({ ...profil, email: e.target.value })}
+                  className="cursor-default bg-muted/40"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="telephone">Téléphone</Label>
-                <Input
-                  id="telephone"
-                  value={profil.telephone}
-                  onChange={(e) => setProfil({ ...profil, telephone: e.target.value })}
-                />
-              </div>
-
-              <div className="flex justify-end">
-                <Button onClick={enregistrerProfil} disabled={estEnregistrement}>
-                  {estEnregistrement ? (
-                    <Spinner className="mr-2 h-4 w-4" />
-                  ) : (
-                    <Save className="mr-2 h-4 w-4" />
-                  )}
-                  Enregistrer
-                </Button>
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,7rem)_1fr]">
+                <div className="space-y-2">
+                  <Label htmlFor="indicatif">Indicatif</Label>
+                  <Input
+                    id="indicatif"
+                    readOnly
+                    inputMode="numeric"
+                    autoComplete="tel-country-code"
+                    placeholder="inconnu"
+                    value={profil.indicatifPays ?? ''}
+                    className="cursor-default bg-muted/40"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="telephone">Téléphone</Label>
+                  <Input
+                    id="telephone"
+                    readOnly
+                    type="tel"
+                    autoComplete="tel-national"
+                    placeholder="inconnu"
+                    value={profil.telephone ?? ''}
+                    className="cursor-default bg-muted/40"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Changement de mot de passe */}
           <Card className="border-border/40 shadow-sm">
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -183,6 +232,18 @@ export default function PageProfil() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {erreurMotDePasse ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Mot de passe</AlertTitle>
+                  <AlertDescription>{erreurMotDePasse}</AlertDescription>
+                </Alert>
+              ) : null}
+              {succesMotDePasse ? (
+                <Alert>
+                  <AlertTitle>Mot de passe</AlertTitle>
+                  <AlertDescription>{succesMotDePasse}</AlertDescription>
+                </Alert>
+              ) : null}
               <div className="space-y-2">
                 <Label htmlFor="mdpActuel">Mot de passe actuel</Label>
                 <Input
@@ -190,6 +251,7 @@ export default function PageProfil() {
                   type="password"
                   value={motsDePasse.actuel}
                   onChange={(e) => setMotsDePasse({ ...motsDePasse, actuel: e.target.value })}
+                  autoComplete="current-password"
                 />
               </div>
 
@@ -201,6 +263,7 @@ export default function PageProfil() {
                     type="password"
                     value={motsDePasse.nouveau}
                     onChange={(e) => setMotsDePasse({ ...motsDePasse, nouveau: e.target.value })}
+                    autoComplete="new-password"
                   />
                 </div>
                 <div className="space-y-2">
@@ -210,6 +273,7 @@ export default function PageProfil() {
                     type="password"
                     value={motsDePasse.confirmation}
                     onChange={(e) => setMotsDePasse({ ...motsDePasse, confirmation: e.target.value })}
+                    autoComplete="new-password"
                   />
                 </div>
               </div>

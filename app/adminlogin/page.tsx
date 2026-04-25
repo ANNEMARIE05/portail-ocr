@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { lire2faRequisAdmin } from '@/lib/mfa-preference'
+import { estBackendAdminConfigure } from '@/lib/api/env-backend'
+import { chargerProfilAdmin, connexionAdministrateur } from '@/lib/api/auth-api'
 
 export default function PageConnexionAdmin() {
   const router = useRouter()
@@ -24,24 +26,52 @@ export default function PageConnexionAdmin() {
     setErreur('')
     setEstChargement(true)
 
-    // Simulation d'appel API
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    if (email && motDePasse) {
-      const cible = '/admin/tableau'
-      if (lire2faRequisAdmin()) {
-        router.push(
-          `/otp?email=${encodeURIComponent(email)}&next=${encodeURIComponent(
-            cible
-          )}&profile=admin`
-        )
-      } else {
-        router.push(cible)
-      }
-    } else {
+    if (!email || !motDePasse) {
       setErreur('Veuillez remplir tous les champs')
       setEstChargement(false)
+      return
     }
+
+    const cible = '/admin/tableau'
+
+    if (estBackendAdminConfigure()) {
+      const res = await connexionAdministrateur(email, motDePasse)
+      if (res.type === 'erreur') {
+        setErreur(res.message)
+        setEstChargement(false)
+        return
+      }
+      if (res.type === 'otp_2fa') {
+        router.push(
+          `/otp?email=${encodeURIComponent(email)}&next=${encodeURIComponent(cible)}&profile=admin&mode=connexion&userid=${encodeURIComponent(res.userId)}`
+        )
+        setEstChargement(false)
+        return
+      }
+      if (res.type === 'session') {
+        const profil = await chargerProfilAdmin(res.token)
+        if (!profil.ok) {
+          setErreur(profil.erreur ?? 'Impossible de charger le profil.')
+          setEstChargement(false)
+          return
+        }
+        router.push(cible)
+        setEstChargement(false)
+        return
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    if (lire2faRequisAdmin()) {
+      router.push(
+        `/otp?email=${encodeURIComponent(email)}&next=${encodeURIComponent(
+          cible
+        )}&profile=admin`
+      )
+    } else {
+      router.push(cible)
+    }
+    setEstChargement(false)
   }
 
   return (

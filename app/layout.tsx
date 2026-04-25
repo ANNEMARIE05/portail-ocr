@@ -14,21 +14,8 @@ export const metadata: Metadata = {
   description: 'Portail d\'administration pour la plateforme OCR',
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: [{ url: '/favicon-ngser.jpg', type: 'image/jpeg', sizes: '200x200' }],
+    apple: '/favicon-ngser.jpg',
   },
 }
 

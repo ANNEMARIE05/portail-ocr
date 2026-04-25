@@ -26,7 +26,6 @@ interface ElementMenu {
   label: string
   href: string
   icone: React.ComponentType<{ className?: string }>
-  badge?: number
 }
 
 const menuPrincipal: ElementMenu[] = [
@@ -54,8 +53,8 @@ interface PropsSidebarUser {
 
 export function SidebarUser({
   onDeconnexion,
-  quotaUtilise = 340,
-  quotaTotal = 500,
+  quotaUtilise = 0,
+  quotaTotal = 0,
   estReduit: estReduitControle,
   onEstReduitChange,
 }: PropsSidebarUser) {
@@ -88,21 +87,13 @@ export function SidebarUser({
           'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
           'hover:bg-slate-100',
           actif ? 'bg-slate-100 text-slate-900' : 'text-slate-600',
-          estReduit && 'justify-center px-2'
+          estReduit && 'justify-center px-2',
+          !estReduit && 'max-md:justify-center max-md:px-2',
         )}
-        title={estReduit ? element.label : undefined}
+        title={element.label}
       >
         <Icone className={cn('h-5 w-5 shrink-0', actif ? 'text-slate-900' : 'text-slate-500')} />
-        {!estReduit && (
-          <>
-            <span className="flex-1">{element.label}</span>
-            {element.badge && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
-                {element.badge}
-              </span>
-            )}
-          </>
-        )}
+        {!estReduit && <span className="hidden flex-1 md:block">{element.label}</span>}
       </Link>
     )
   }
@@ -111,16 +102,22 @@ export function SidebarUser({
     <aside
       className={cn(
         'fixed inset-y-0 left-0 z-30 flex flex-col border-r border-slate-200 bg-white transition-all duration-300',
-        estReduit ? 'w-16' : 'w-64'
+        estReduit ? 'w-16' : 'w-64 max-md:w-16',
       )}
     >
-      <div className={cn('flex h-16 items-center border-b border-slate-200 px-4', estReduit && 'justify-center px-2')}>
+      <div
+        className={cn(
+          'flex h-16 items-center border-b border-slate-200 px-4',
+          estReduit && 'justify-center px-2',
+          !estReduit && 'max-md:justify-center max-md:px-2',
+        )}
+      >
         <Link href="/user" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
             <ScanLine className="h-5 w-5 text-white" />
           </div>
           {!estReduit && (
-            <div className="flex flex-col">
+            <div className="hidden flex-col md:flex">
               <span className="text-lg font-semibold text-slate-900">Portail OCR</span>
               <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Espace personnel</span>
             </div>
@@ -129,7 +126,7 @@ export function SidebarUser({
       </div>
 
       {!estReduit && (
-        <div className="mx-3 mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div className="mx-3 mt-4 hidden rounded-lg border border-slate-200 bg-slate-50 p-3 md:block">
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Sparkles className="h-4 w-4 text-primary" />
@@ -155,7 +152,9 @@ export function SidebarUser({
 
         <div className="space-y-1">
           {!estReduit && (
-            <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Mon compte</p>
+            <p className="hidden px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400 md:block">
+              Mon compte
+            </p>
           )}
           {menuSecondaire.map(renderLien)}
         </div>
@@ -167,12 +166,13 @@ export function SidebarUser({
           className={cn(
             'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-600 transition-colors',
             'hover:bg-red-50 hover:text-red-600',
-            estReduit && 'justify-center px-2'
+            estReduit && 'justify-center px-2',
+            !estReduit && 'max-md:justify-center max-md:px-2',
           )}
-          title={estReduit ? 'Deconnexion' : undefined}
+          title="Deconnexion"
         >
           <LogOut className="h-5 w-5 shrink-0" />
-          {!estReduit && <span>Deconnexion</span>}
+          {!estReduit && <span className="hidden md:inline">Deconnexion</span>}
         </button>
       </div>
 
@@ -181,8 +181,8 @@ export function SidebarUser({
         size="icon"
         onClick={() => definirEstReduit(!estReduit)}
         className={cn(
-          'absolute -right-3 top-20 h-6 w-6 rounded-full border border-slate-200 bg-white shadow-sm',
-          'hover:bg-slate-50'
+          'absolute -right-3 top-20 hidden h-6 w-6 rounded-full border border-slate-200 bg-white shadow-sm md:flex',
+          'hover:bg-slate-50',
         )}
       >
         <ChevronLeft className={cn('h-4 w-4 text-slate-500 transition-transform', estReduit && 'rotate-180')} />

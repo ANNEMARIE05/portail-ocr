@@ -36,6 +36,8 @@ export interface ChampFormulaire {
   max?: number
   rows?: number
   description?: string
+  /** Si vrai, champ en lecture seule (grisé), non pris en compte pour l’exigence « requis ». */
+  desactive?: boolean
 }
 
 interface ModaleFormulaireProps {
@@ -65,41 +67,43 @@ export function ModaleFormulaire({
   const [estChargement, setEstChargement] = useState(false)
   const [erreurs, setErreurs] = useState<Record<string, string>>({})
 
+  /** Réinitialise uniquement à l’ouverture de la modale (pas à chaque rendu parent) — sinon
+   *  `donneesInitiales` (nouvel objet) ou `champs` feraient disparaître la saisie en cours. */
   useEffect(() => {
-    if (estOuverte) {
-      const valeursInitiales: Record<string, string | number | boolean> = {}
-      champs.forEach((champ) => {
-        if (donneesInitiales && donneesInitiales[champ.id] !== undefined) {
-          valeursInitiales[champ.id] = donneesInitiales[champ.id]
-        } else if (champ.defaultValue !== undefined) {
-          valeursInitiales[champ.id] = champ.defaultValue
-        } else if (champ.type === 'switch') {
-          valeursInitiales[champ.id] = false
-        } else if (champ.type === 'number') {
-          valeursInitiales[champ.id] = 0
-        } else {
-          valeursInitiales[champ.id] = ''
-        }
-      })
-      queueMicrotask(() => {
-        setDonnees(valeursInitiales)
-        setErreurs({})
-      })
+    if (!estOuverte) {
+      return
     }
-  }, [estOuverte, champs, donneesInitiales])
+    const valeursInitiales: Record<string, string | number | boolean> = {}
+    champs.forEach((champ) => {
+      if (donneesInitiales && donneesInitiales[champ.id] !== undefined) {
+        valeursInitiales[champ.id] = donneesInitiales[champ.id]
+      } else if (champ.defaultValue !== undefined) {
+        valeursInitiales[champ.id] = champ.defaultValue
+      } else if (champ.type === 'switch') {
+        valeursInitiales[champ.id] = false
+      } else if (champ.type === 'number') {
+        valeursInitiales[champ.id] = 0
+      } else {
+        valeursInitiales[champ.id] = ''
+      }
+    })
+    setDonnees(valeursInitiales)
+    setErreurs({})
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seule l’ouverture doit réappliquer les champs
+  }, [estOuverte])
 
   const validerFormulaire = (): boolean => {
     const nouvellesErreurs: Record<string, string> = {}
     
     champs.forEach((champ) => {
-      if (champ.required) {
+      if (champ.required && !champ.desactive) {
         const valeur = donnees[champ.id]
         if (valeur === undefined || valeur === '' || valeur === null) {
           nouvellesErreurs[champ.id] = `${champ.label} est requis`
         }
       }
       
-      if (champ.type === 'email' && donnees[champ.id]) {
+      if (champ.type === 'email' && donnees[champ.id] && !champ.desactive) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
         if (!emailRegex.test(String(donnees[champ.id]))) {
           nouvellesErreurs[champ.id] = 'Email invalide'
@@ -146,7 +150,7 @@ export function ModaleFormulaire({
           <div key={champ.id} className="space-y-2">
             <Label htmlFor={champ.id} className="text-sm font-medium">
               {champ.label}
-              {champ.required && <span className="text-destructive ml-1">*</span>}
+              {champ.required && !champ.desactive && <span className="text-destructive ml-1">*</span>}
             </Label>
             <Textarea
               id={champ.id}
@@ -154,7 +158,8 @@ export function ModaleFormulaire({
               onChange={(e) => mettreAJourChamp(champ.id, e.target.value)}
               placeholder={champ.placeholder}
               rows={champ.rows || 3}
-              className={cn(erreur && 'border-destructive')}
+              disabled={champ.desactive}
+              className={cn(erreur && 'border-destructive', champ.desactive && 'cursor-not-allowed bg-muted/50 text-muted-foreground')}
             />
             {champ.description && (
               <p className="text-xs text-muted-foreground">{champ.description}</p>
@@ -168,13 +173,19 @@ export function ModaleFormulaire({
           <div key={champ.id} className="space-y-2">
             <Label htmlFor={champ.id} className="text-sm font-medium">
               {champ.label}
-              {champ.required && <span className="text-destructive ml-1">*</span>}
+              {champ.required && !champ.desactive && <span className="text-destructive ml-1">*</span>}
             </Label>
             <Select
               value={String(valeur || '')}
               onValueChange={(val) => mettreAJourChamp(champ.id, val)}
+              disabled={champ.desactive}
             >
-              <SelectTrigger className={cn(erreur && 'border-destructive')}>
+              <SelectTrigger
+                className={cn(
+                  erreur && 'border-destructive',
+                  champ.desactive && 'cursor-not-allowed bg-muted/50 text-muted-foreground',
+                )}
+              >
                 <SelectValue placeholder={champ.placeholder || `Sélectionner ${champ.label.toLowerCase()}`} />
               </SelectTrigger>
               <SelectContent>
@@ -191,7 +202,13 @@ export function ModaleFormulaire({
 
       case 'switch':
         return (
-          <div key={champ.id} className="flex items-center justify-between rounded-lg border border-border p-4">
+          <div
+            key={champ.id}
+            className={cn(
+              'flex items-center justify-between rounded-lg border border-border p-4',
+              champ.desactive && 'bg-muted/30',
+            )}
+          >
             <div className="space-y-0.5">
               <Label htmlFor={champ.id} className="text-sm font-medium">
                 {champ.label}
@@ -204,37 +221,52 @@ export function ModaleFormulaire({
               id={champ.id}
               checked={Boolean(valeur)}
               onCheckedChange={(checked) => mettreAJourChamp(champ.id, checked)}
+              disabled={champ.desactive}
             />
           </div>
         )
 
-      case 'number':
+      case 'number': {
+        const affichage =
+          valeur === '' || valeur === undefined ? '' : String(valeur as string | number)
         return (
           <div key={champ.id} className="space-y-2">
             <Label htmlFor={champ.id} className="text-sm font-medium">
               {champ.label}
-              {champ.required && <span className="text-destructive ml-1">*</span>}
+              {champ.required && !champ.desactive && <span className="text-destructive ml-1">*</span>}
             </Label>
             <Input
               id={champ.id}
               type="number"
-              value={valeur as number}
-              onChange={(e) => mettreAJourChamp(champ.id, parseFloat(e.target.value) || 0)}
+              value={affichage}
+              onChange={(e) => {
+                const raw = e.target.value
+                if (raw === '') {
+                  mettreAJourChamp(champ.id, '')
+                  return
+                }
+                const n = parseFloat(raw)
+                if (!Number.isNaN(n)) {
+                  mettreAJourChamp(champ.id, n)
+                }
+              }}
               placeholder={champ.placeholder}
               min={champ.min}
               max={champ.max}
-              className={cn(erreur && 'border-destructive')}
+              disabled={champ.desactive}
+              className={cn(erreur && 'border-destructive', champ.desactive && 'cursor-not-allowed bg-muted/50 text-muted-foreground')}
             />
             {erreur && <p className="text-xs text-destructive">{erreur}</p>}
           </div>
         )
+      }
 
       default:
         return (
           <div key={champ.id} className="space-y-2">
             <Label htmlFor={champ.id} className="text-sm font-medium">
               {champ.label}
-              {champ.required && <span className="text-destructive ml-1">*</span>}
+              {champ.required && !champ.desactive && <span className="text-destructive ml-1">*</span>}
             </Label>
             <Input
               id={champ.id}
@@ -242,7 +274,8 @@ export function ModaleFormulaire({
               value={String(valeur || '')}
               onChange={(e) => mettreAJourChamp(champ.id, e.target.value)}
               placeholder={champ.placeholder}
-              className={cn(erreur && 'border-destructive')}
+              disabled={champ.desactive}
+              className={cn(erreur && 'border-destructive', champ.desactive && 'cursor-not-allowed bg-muted/50 text-muted-foreground')}
             />
             {erreur && <p className="text-xs text-destructive">{erreur}</p>}
           </div>

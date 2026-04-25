@@ -8,6 +8,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { lire2faRequisAdmin, lire2faRequisUtilisateur } from '@/lib/mfa-preference'
+import { estBackendAdminConfigure, estBackendUtilisateurConfigure } from '@/lib/api/env-backend'
+import {
+  chargerProfilAdmin,
+  chargerProfilUtilisateur,
+  renvoyerOtp,
+  verifier2FA,
+  verifierOtpConnexionOuReset,
+} from '@/lib/api/auth-api'
 
 function ContenuOTP() {
   const router = useRouter()
@@ -16,6 +24,9 @@ function ContenuOTP() {
   const destination = searchParams.get('next') || '/user'
   const profil = searchParams.get('profile') || 'user'
   const estAdmin = profil === 'admin'
+  const mode = searchParams.get('mode') ?? 'connexion'
+  const purpose = searchParams.get('purpose') ?? ''
+  const userId2fa = searchParams.get('userid') ?? ''
 
   const [code, setCode] = useState(['', '', '', '', '', ''])
   const [estChargement, setEstChargement] = useState(false)
@@ -28,17 +39,24 @@ function ContenuOTP() {
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
-  // Si le 2FA n’est plus exigé, rediriger sans montrer la page
   useLayoutEffect(() => {
-    const requis = estAdmin
-      ? lire2faRequisAdmin()
-      : lire2faRequisUtilisateur()
-    if (!requis) {
-      router.replace(destination)
+    const backend = estAdmin ? estBackendAdminConfigure() : estBackendUtilisateurConfigure()
+    const requisDemo = estAdmin ? lire2faRequisAdmin() : lire2faRequisUtilisateur()
+    const fluxReinitialisation = mode === 'reinitialisation'
+    /** Connexion + API : écran OTP uniquement si le login a renvoyé une étape 2FA (`userid`), comme l’ancien portail. */
+    const fluxConnexion2faRequis =
+      backend && mode === 'connexion' && userId2fa.trim().length > 0
+
+    if (backend && (fluxConnexion2faRequis || fluxReinitialisation)) {
+      queueMicrotask(() => setPeutSaisir(true))
       return
     }
-    queueMicrotask(() => setPeutSaisir(true))
-  }, [estAdmin, destination, router])
+    if (!backend && requisDemo) {
+      queueMicrotask(() => setPeutSaisir(true))
+      return
+    }
+    router.replace(destination)
+  }, [estAdmin, destination, router, mode, userId2fa])
 
   // Timer pour le renvoi de code
   useEffect(() => {
@@ -96,16 +114,102 @@ function ContenuOTP() {
     setEstChargement(true)
     setErreur('')
 
-    // Simulation de vérification
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    const service = estAdmin ? 'admin' : 'user'
+    const backend = estAdmin ? estBackendAdminConfigure() : estBackendUtilisateurConfigure()
 
-    // Pour la démo : accepter tout code de 6 chiffres
-    if (codeComplet.length === 6) {
+    if (backend && userId2fa) {
+      const res = await verifier2FA({
+        service,
+        userId: userId2fa,
+        code: codeComplet,
+      })
+      if (!res.ok || !res.token) {
+        setErreur(res.erreur ?? 'Code incorrect.')
+        setEstChargement(false)
+        setCode(['', '', '', '', '', ''])
+        inputRefs.current[0]?.focus()
+        return
+      }
+      const profil = estAdmin
+        ? await chargerProfilAdmin(res.token)
+        : await chargerProfilUtilisateur(res.token)
+      if (!profil.ok) {
+        setErreur(profil.erreur ?? 'Session invalide.')
+        setEstChargement(false)
+        return
+      }
       setEstVerifie(true)
-      // Attendre l'animation puis rediriger
+      setEstChargement(false)
       setTimeout(() => {
         router.push(destination)
-      }, 1500)
+      }, 1200)
+      return
+    }
+
+    if (backend && mode === 'connexion' && !userId2fa && email) {
+      const res = await verifierOtpConnexionOuReset({
+        service,
+        email,
+        code: codeComplet,
+        purpose: purpose || 'login',
+      })
+      if (!res.ok) {
+        setErreur(res.erreur ?? 'Code incorrect.')
+        setEstChargement(false)
+        setCode(['', '', '', '', '', ''])
+        inputRefs.current[0]?.focus()
+        return
+      }
+      if (res.token) {
+        const profil = estAdmin
+          ? await chargerProfilAdmin(res.token)
+          : await chargerProfilUtilisateur(res.token)
+        if (!profil.ok) {
+          setErreur(profil.erreur ?? 'Session invalide.')
+          setEstChargement(false)
+          return
+        }
+      }
+      setEstVerifie(true)
+      setEstChargement(false)
+      setTimeout(() => {
+        router.push(destination)
+      }, 1200)
+      return
+    }
+
+    if (backend && mode === 'reinitialisation') {
+      const res = await verifierOtpConnexionOuReset({
+        service,
+        email,
+        code: codeComplet,
+        purpose: purpose || 'password reset',
+      })
+      if (!res.ok) {
+        setErreur(res.erreur ?? 'Code incorrect.')
+        setEstChargement(false)
+        setCode(['', '', '', '', '', ''])
+        inputRefs.current[0]?.focus()
+        return
+      }
+      setEstVerifie(true)
+      setEstChargement(false)
+      const q = new URLSearchParams()
+      q.set('email', email)
+      if (estAdmin) q.set('profile', 'admin')
+      setTimeout(() => {
+        router.push(`/reinitialisation?${q.toString()}`)
+      }, 1200)
+      return
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    if (codeComplet.length === 6) {
+      setEstVerifie(true)
+      setEstChargement(false)
+      setTimeout(() => {
+        router.push(destination)
+      }, 1200)
     } else {
       setErreur('Code invalide. Veuillez réessayer.')
       setEstChargement(false)
@@ -116,7 +220,20 @@ function ContenuOTP() {
 
   const renvoyerCode = async () => {
     setRenvoyerEnCours(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    const service = estAdmin ? 'admin' : 'user'
+    const backend = estAdmin ? estBackendAdminConfigure() : estBackendUtilisateurConfigure()
+    if (backend && email) {
+      const fin = await renvoyerOtp({
+        service,
+        email,
+        purpose: purpose || (mode === 'reinitialisation' ? 'password reset' : 'login'),
+      })
+      if (!fin.ok) {
+        setErreur(fin.erreur ?? 'Impossible de renvoyer le code.')
+      }
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 600))
+    }
     setTempsRestant(60)
     setPeutRenvoyer(false)
     setRenvoyerEnCours(false)

@@ -109,7 +109,7 @@ export function CarteStats({
             <Icone className={cn('h-3.5 w-3.5 sm:h-4 sm:w-4', config.icone)} />
           </div>
         </div>
-        <p className="text-xl font-semibold leading-none tracking-tight text-foreground tabular-nums sm:text-2xl">
+        <p className="text-lg font-semibold leading-none tracking-tight text-foreground tabular-nums sm:text-xl md:text-2xl">
           <CompteurAnime
             valeur={valeurCompteur}
             format={format}

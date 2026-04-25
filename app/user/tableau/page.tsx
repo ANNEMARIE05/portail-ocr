@@ -6,12 +6,18 @@ import { CarteStatUser } from '@/components/user/carte-stat-user'
 import { ChargeurPageUser } from '@/components/user/chargeur-page-user'
 import { Button } from '@/components/ui/button'
 import { recupererStatistiquesUser } from '@/lib/api/user-service'
+import { titreBienvenueDepuisUserinfo } from '@/lib/api/session-client'
 import type { StatistiquesUser } from '@/lib/types-user'
 import Link from 'next/link'
 
 export default function PageTableauBordUser() {
   const [estChargement, setEstChargement] = useState(true)
   const [stats, setStats] = useState<StatistiquesUser | null>(null)
+  const [titreBienvenue, setTitreBienvenue] = useState('Bonjour')
+
+  useEffect(() => {
+    setTitreBienvenue(titreBienvenueDepuisUserinfo())
+  }, [])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -42,15 +48,15 @@ export default function PageTableauBordUser() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2 sm:space-y-4 md:space-y-6">
       {/* Message de bienvenue */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Bonjour Marie</h2>
-          <p className="text-sm text-slate-500">Voici un apercu de votre activite OCR</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0 space-y-0 sm:space-y-1">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl md:text-2xl">{titreBienvenue}</h2>
+          <p className="text-[11px] text-slate-500 sm:text-xs md:text-sm">Voici un apercu de votre activite OCR</p>
         </div>
-        <Link href="/user/documents">
-          <Button className="gap-2 bg-primary hover:bg-primary/90">
+        <Link href="/user/documents" className="shrink-0">
+          <Button className="w-full gap-2 bg-primary hover:bg-primary/90 sm:w-auto">
             <Upload className="h-4 w-4" />
             Nouvelle extraction
           </Button>
@@ -58,7 +64,7 @@ export default function PageTableauBordUser() {
       </div>
 
       {/* Cartes statistiques */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 md:gap-3 lg:grid-cols-4">
         <CarteStatUser
           titre="Documents traités"
           valeur={stats.documentsTraites}

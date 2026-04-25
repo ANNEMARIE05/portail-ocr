@@ -13,7 +13,14 @@ import { ModaleConfirmation } from '@/components/admin/confirmation-modal'
 import { ModaleFormulaire, type ChampFormulaire } from '@/components/admin/form-modal'
 import { ModaleDetail, type SectionDetail } from '@/components/admin/detail-modal'
 import { ChargeurPage } from '@/components/admin/page-loader'
-import { recupererUtilisateurs, modifierStatutUtilisateur } from '@/lib/api/admin-service'
+import {
+  creerUtilisateur,
+  modifierStatutUtilisateur,
+  modifierUtilisateur,
+  recupererUtilisateurs,
+  supprimerUtilisateur,
+} from '@/lib/api/admin-service'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import type { Utilisateur, ColonneTable, ActionLigne, ConfigPagination, StatutUtilisateur } from '@/lib/types-admin'
 import { formaterDateCourte, separerPrenomNom, genererInitiales, formaterTelephone, formaterNombre } from '@/lib/utils/formatage'
 
@@ -56,28 +63,22 @@ const champsFormulaireCreation: ChampFormulaire[] = [
   },
 ]
 
-const champsFormulaireModification: ChampFormulaire[] = [
-  ...champsFormulaireCreation,
-  {
-    id: 'quotaTotal',
-    label: 'Quota total',
-    type: 'number',
-    placeholder: '500',
-    required: true,
-    min: 0,
-  },
-  {
-    id: 'statut',
-    label: 'Statut',
-    type: 'select',
-    required: true,
-    options: [
-      { value: 'actif', label: 'Actif' },
-      { value: 'inactif', label: 'Inactif' },
-      { value: 'suspendu', label: 'Suspendu' },
-    ],
-  },
-]
+const champsFormulaireModification: ChampFormulaire[] = (
+  [
+    ...champsFormulaireCreation,
+    {
+      id: 'statut',
+      label: 'Statut',
+      type: 'select' as const,
+      required: true,
+      options: [
+        { value: 'actif', label: 'Actif' },
+        { value: 'inactif', label: 'Inactif' },
+        { value: 'suspendu', label: 'Suspendu' },
+      ],
+    } satisfies ChampFormulaire,
+  ] as ChampFormulaire[]
+).map((c) => (c.id === 'email' ? c : { ...c, desactive: true }))
 
 export default function PageUtilisateurs() {
   const [estChargement, setEstChargement] = useState(true)
@@ -91,6 +92,7 @@ export default function PageUtilisateurs() {
   const [modaleDetailOuverte, setModaleDetailOuverte] = useState(false)
   const [modaleSuppressionOuverte, setModaleSuppressionOuverte] = useState(false)
   const [actionEnCours, setActionEnCours] = useState(false)
+  const [messageErreur, setMessageErreur] = useState<string | null>(null)
 
   const chargerUtilisateurs = useCallback(async () => {
     setEstChargement(true)
@@ -133,49 +135,84 @@ export default function PageUtilisateurs() {
   }
 
   const gererCreation = async (donnees: Record<string, string | number | boolean>) => {
+    setMessageErreur(null)
     const { prenom, nom } = separerPrenomNom(String(donnees.nomComplet))
-
-    const nouvelUtilisateur: Utilisateur = {
-      id: `user-${Date.now()}`,
+    const reponse = await creerUtilisateur({
       prenom,
       nom,
       email: String(donnees.email),
-      telephone: '—',
-      entreprise: String(donnees.entreprise),
       role: String(donnees.role),
-      dateInscription: new Date(),
-      derniereConnexion: new Date(),
-      statut: 'actif',
-      quotaTotal: 500,
-      quotaUtilise: 0,
+      entreprise: String(donnees.entreprise),
+    })
+    if (!reponse.succes) {
+      setMessageErreur(reponse.erreur ?? 'Création impossible')
+      return
     }
-    setUtilisateurs((prev) => [nouvelUtilisateur, ...prev])
+    setModaleCreationOuverte(false)
+    setPagination((prev) => ({ ...prev, page: 1 }))
+    const refresh = await recupererUtilisateurs(1, pagination.parPage, {
+      recherche,
+      statut: 'tous',
+    })
+    if (refresh.succes && refresh.donnees) {
+      setUtilisateurs(refresh.donnees)
+      if (refresh.pagination) {
+        setPagination(refresh.pagination)
+      }
+    }
   }
 
   const gererModification = async (donnees: Record<string, string | number | boolean>) => {
     if (!utilisateurSelectionne) return
-
-    const { prenom, nom } = separerPrenomNom(String(donnees.nomComplet))
-
-    const utilisateurMisAJour: Utilisateur = {
-      ...utilisateurSelectionne,
-      prenom,
-      nom,
+    setMessageErreur(null)
+    const reponse = await modifierUtilisateur(utilisateurSelectionne.id, {
+      prenom: utilisateurSelectionne.prenom,
+      nom: utilisateurSelectionne.nom,
       email: String(donnees.email),
-      entreprise: String(donnees.entreprise),
-      role: String(donnees.role),
-      quotaTotal: Number(donnees.quotaTotal),
-      statut: donnees.statut as StatutUtilisateur,
+      entreprise: utilisateurSelectionne.entreprise,
+      role: utilisateurSelectionne.role,
+      statut: utilisateurSelectionne.statut,
+    })
+    if (!reponse.succes) {
+      setMessageErreur(reponse.erreur ?? 'Mise à jour impossible')
+      return
     }
-
-    setUtilisateurs((prev) => prev.map((u) => (u.id === utilisateurSelectionne.id ? utilisateurMisAJour : u)))
+    setModaleModificationOuverte(false)
+    setUtilisateurSelectionne(null)
+    const refresh = await recupererUtilisateurs(pagination.page, pagination.parPage, {
+      recherche,
+      statut: 'tous',
+    })
+    if (refresh.succes && refresh.donnees) {
+      setUtilisateurs(refresh.donnees)
+      if (refresh.pagination) {
+        setPagination(refresh.pagination)
+      }
+    }
   }
 
-  const gererSuppression = () => {
+  const gererSuppression = async () => {
     if (!utilisateurSelectionne) return
-    setUtilisateurs((prev) => prev.filter((u) => u.id !== utilisateurSelectionne.id))
+    setMessageErreur(null)
+    setActionEnCours(true)
+    const reponse = await supprimerUtilisateur(utilisateurSelectionne.id)
+    setActionEnCours(false)
+    if (!reponse.succes) {
+      setMessageErreur(reponse.erreur ?? 'Suppression impossible')
+      return
+    }
     setModaleSuppressionOuverte(false)
     setUtilisateurSelectionne(null)
+    const refresh = await recupererUtilisateurs(pagination.page, pagination.parPage, {
+      recherche,
+      statut: 'tous',
+    })
+    if (refresh.succes && refresh.donnees) {
+      setUtilisateurs(refresh.donnees)
+      if (refresh.pagination) {
+        setPagination(refresh.pagination)
+      }
+    }
   }
 
   const getSectionsDetail = (utilisateur: Utilisateur): SectionDetail[] => [
@@ -335,12 +372,24 @@ export default function PageUtilisateurs() {
 
   return (
     <div className="space-y-6">
+      {messageErreur ? (
+        <Alert variant="destructive">
+          <AlertTitle>Action impossible</AlertTitle>
+          <AlertDescription>{messageErreur}</AlertDescription>
+        </Alert>
+      ) : null}
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <div className="min-w-0 flex-1 space-y-1">
           <h2 className="text-base font-semibold tracking-tight text-foreground">Liste des utilisateurs</h2>
           <p className="text-sm text-muted-foreground">Comptes clients — recherche, création et gestion.</p>
         </div>
-        <Button onClick={() => setModaleCreationOuverte(true)} className="shrink-0 bg-primary hover:bg-primary/90">
+        <Button
+          onClick={() => {
+            setMessageErreur(null)
+            setModaleCreationOuverte(true)
+          }}
+          className="shrink-0 bg-primary hover:bg-primary/90"
+        >
           <Plus className="mr-2 h-4 w-4" />
           Nouvel utilisateur
         </Button>
@@ -375,7 +424,10 @@ export default function PageUtilisateurs() {
 
       <ModaleFormulaire
         estOuverte={modaleCreationOuverte}
-        onFermer={() => setModaleCreationOuverte(false)}
+        onFermer={() => {
+          setMessageErreur(null)
+          setModaleCreationOuverte(false)
+        }}
         onSoumettre={gererCreation}
         titre="utilisateur"
         description="Créez un nouveau compte (nom complet, email, rôle et compagnie)"
@@ -387,12 +439,13 @@ export default function PageUtilisateurs() {
       <ModaleFormulaire
         estOuverte={modaleModificationOuverte}
         onFermer={() => {
+          setMessageErreur(null)
           setModaleModificationOuverte(false)
           setUtilisateurSelectionne(null)
         }}
         onSoumettre={gererModification}
         titre="utilisateur"
-        description="Modifiez les informations de l'utilisateur"
+        description="Seul l'email est modifiable (nom, rôle, compagnie et statut se gèrent ailleurs)"
         champs={champsFormulaireModification}
         texteValidation="Enregistrer"
         donneesInitiales={
@@ -402,7 +455,6 @@ export default function PageUtilisateurs() {
                 email: utilisateurSelectionne.email,
                 role: utilisateurSelectionne.role,
                 entreprise: utilisateurSelectionne.entreprise,
-                quotaTotal: utilisateurSelectionne.quotaTotal,
                 statut: utilisateurSelectionne.statut,
               }
             : undefined
@@ -452,6 +504,7 @@ export default function PageUtilisateurs() {
       <ModaleConfirmation
         estOuverte={modaleSuppressionOuverte}
         onFermer={() => {
+          setMessageErreur(null)
           setModaleSuppressionOuverte(false)
           setUtilisateurSelectionne(null)
         }}

@@ -26,7 +26,6 @@ interface ElementMenu {
   label: string
   href: string
   icone: React.ComponentType<{ className?: string }>
-  badge?: number
 }
 
 const menuPrincipal: ElementMenu[] = [
@@ -39,9 +38,9 @@ const menuPrincipal: ElementMenu[] = [
   { label: 'Packs', href: '/admin/packs', icone: Package },
 ]
 
-const menuSecondaire: ElementMenu[] = [
-  { label: 'Demandes suppression', href: '/admin/demandes-suppression', icone: Trash2, badge: 2 },
-  { label: 'Support', href: '/admin/support', icone: MessageSquare, badge: 3 },
+const entreesModeration: ElementMenu[] = [
+  { label: 'Demandes suppression', href: '/admin/demandes-suppression', icone: Trash2 },
+  { label: 'Support', href: '/admin/support', icone: MessageSquare },
 ]
 
 const menuBas: ElementMenu[] = [
@@ -63,6 +62,7 @@ export function SidebarAdmin({
   const pathname = usePathname()
   const [estReduitInterne, setEstReduitInterne] = useState(false)
   const estReduit = estReduitControle ?? estReduitInterne
+  /** Pas de pastilles ici : les compteurs globaux ne reflètent pas toujours les listes (pagination, recherche) sur chaque page. Voir l’en-tête (cloche) pour un résumé modération. */
   const definirEstReduit = (value: boolean) => {
     onEstReduitChange?.(value)
     if (estReduitControle === undefined) setEstReduitInterne(value)
@@ -92,16 +92,7 @@ export function SidebarAdmin({
         title={estReduit ? element.label : undefined}
       >
         <Icone className={cn('h-5 w-5 shrink-0', actif ? 'text-slate-900' : 'text-slate-500')} />
-        {!estReduit && (
-          <>
-            <span className="flex-1">{element.label}</span>
-            {element.badge && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
-                {element.badge}
-              </span>
-            )}
-          </>
-        )}
+        {!estReduit && <span className="flex-1">{element.label}</span>}
       </Link>
     )
   }
@@ -137,7 +128,7 @@ export function SidebarAdmin({
               Modération
             </p>
           )}
-          {menuSecondaire.map(renderLien)}
+          {entreesModeration.map(renderLien)}
         </div>
       </nav>
 

@@ -88,10 +88,10 @@ export default function PageApis() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-5 md:space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-slate-900">Mes cles API</h2>
-        <p className="text-sm text-slate-500">Gerez vos cles d&apos;acces a l&apos;API OCR</p>
+        <h2 className="text-base font-semibold text-slate-900 sm:text-lg">Mes cles API</h2>
+        <p className="text-xs text-slate-500 sm:text-sm">Gerez vos cles d&apos;acces a l&apos;API OCR</p>
       </div>
 
       {stats && (

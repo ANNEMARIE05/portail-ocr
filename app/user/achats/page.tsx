@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { FileStack } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ChargeurPageUser } from '@/components/user/chargeur-page-user'
-import { recupererPacksDisponibles } from '@/lib/api/user-service'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { acheterPack, recupererPacksDisponibles } from '@/lib/api/user-service'
 import type { PackDisponible } from '@/lib/types-user'
 import { formaterMontant, formaterNombre } from '@/lib/utils/formatage'
 import { cn } from '@/lib/utils'
@@ -18,6 +19,27 @@ export default function PageAchats() {
   const [estChargement, setEstChargement] = useState(true)
   const [packs, setPacks] = useState<PackDisponible[]>([])
   const [packSelectionne, setPackSelectionne] = useState<string | null>(null)
+  const [packEnCoursAchat, setPackEnCoursAchat] = useState<string | null>(null)
+  const [erreurAchat, setErreurAchat] = useState<string | null>(null)
+
+  const choisirPack = async (packId: string) => {
+    setPackSelectionne(packId)
+    setErreurAchat(null)
+    setPackEnCoursAchat(packId)
+    const reponse = await acheterPack(packId)
+    setPackEnCoursAchat(null)
+    if (!reponse.succes) {
+      setErreurAchat(reponse.erreur ?? 'Impossible de lancer le paiement.')
+      return
+    }
+    if (reponse.urlPaiement) {
+      window.location.assign(reponse.urlPaiement)
+      return
+    }
+    setErreurAchat(
+      'Aucun lien de paiement dans la réponse du serveur. Vérifiez la configuration ou contactez le support.',
+    )
+  }
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -39,15 +61,21 @@ export default function PageAchats() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="text-center space-y-2 pb-4">
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Acheter des quotas</h2>
-        <p className="mx-auto max-w-lg text-sm text-slate-500">
+    <div className="space-y-2 sm:space-y-4 md:space-y-6">
+      {erreurAchat ? (
+        <Alert variant="destructive">
+          <AlertTitle>Paiement</AlertTitle>
+          <AlertDescription>{erreurAchat}</AlertDescription>
+        </Alert>
+      ) : null}
+      <div className="space-y-0.5 pb-1.5 text-center sm:space-y-2 sm:pb-4">
+        <h2 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl md:text-2xl">Acheter des quotas</h2>
+        <p className="mx-auto max-w-lg text-[11px] text-slate-500 sm:text-xs md:text-sm">
           Quotas, prix en XOF et validité sont indiqués sur chaque carte.
         </p>
       </div>
 
-      <div className="grid auto-rows-fr gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid auto-rows-fr gap-1.5 sm:grid-cols-2 sm:gap-3 md:gap-4 xl:grid-cols-4">
         {packs.map((pack, index) => {
           return (
             <Card
@@ -57,19 +85,19 @@ export default function PageAchats() {
                 packSelectionne === pack.id && 'ring-2 ring-primary ring-offset-2'
               )}
               style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'backwards' }}
-              onClick={() => setPackSelectionne(pack.id)}
+              onClick={() => {
+                setErreurAchat(null)
+                setPackSelectionne(pack.id)
+              }}
             >
-              <CardHeader className="space-y-2 pb-3">
-                <CardTitle className="text-lg font-semibold text-slate-900">{pack.nom}</CardTitle>
-                <CardDescription className="line-clamp-2 min-h-[2.75rem] text-sm leading-relaxed text-slate-600">
-                  {pack.description}
-                </CardDescription>
+              <CardHeader className="pb-2 sm:pb-3">
+                <CardTitle className="text-sm font-semibold text-slate-900 sm:text-base md:text-lg">{pack.nom}</CardTitle>
               </CardHeader>
 
-              <CardContent className="flex flex-1 flex-col gap-4 pt-0">
+              <CardContent className="flex flex-1 flex-col gap-1.5 pt-0 sm:gap-3 md:gap-4">
                 <div className={classeBlocMetrique}>
                   <FileStack className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-                  <span className="text-sm text-slate-700">
+                  <span className="text-xs text-slate-700 sm:text-sm">
                     <span className="font-semibold tabular-nums">{formaterNombre(pack.credits)}</span>
                     <span className="text-slate-500"> quotas</span>
                   </span>
@@ -77,7 +105,7 @@ export default function PageAchats() {
 
                 <div className={cn(classeBlocMetrique, 'flex-col items-stretch justify-center gap-0.5')}>
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Prix (XOF)</p>
-                  <p className="text-lg font-bold tabular-nums leading-tight text-slate-900">
+                  <p className="text-sm font-bold tabular-nums leading-tight text-slate-900 sm:text-base md:text-lg">
                     {formaterMontant(pack.prix, pack.devise)}
                   </p>
                 </div>
@@ -85,12 +113,13 @@ export default function PageAchats() {
                 <Button
                   type="button"
                   className="mt-auto w-full max-w-full shrink-0"
+                  disabled={packEnCoursAchat !== null}
                   onClick={(e) => {
                     e.stopPropagation()
-                    setPackSelectionne(pack.id)
+                    void choisirPack(pack.id)
                   }}
                 >
-                  Choisir ce pack
+                  {packEnCoursAchat === pack.id ? 'Redirection…' : 'Choisir ce pack'}
                 </Button>
               </CardContent>
             </Card>

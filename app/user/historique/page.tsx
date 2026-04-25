@@ -104,11 +104,11 @@ export default function PageHistorique() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-        <div className="min-w-0 flex-1 space-y-1">
-          <h2 className="text-base font-semibold tracking-tight text-foreground">Historique des appels API</h2>
-          <p className="text-sm text-muted-foreground">
+    <div className="space-y-3 sm:space-y-5 md:space-y-6">
+      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 md:gap-6">
+        <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
+          <h2 className="text-sm font-semibold tracking-tight text-foreground sm:text-base">Historique des appels API</h2>
+          <p className="text-xs text-muted-foreground sm:text-sm">
             Journal des appels API — recherche par URL, méthode ou message d&apos;erreur.
           </p>
         </div>

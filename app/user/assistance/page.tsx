@@ -21,18 +21,22 @@ import {
 } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { creerTicketSupport, recupererTicketsUser } from '@/lib/api/user-service'
 import {
+  envoyerSurWebSocketTicket,
   estApiTicketsRestActive,
   expediteurIdDepuisPayloadWs,
   lireIdUtilisateurStockage,
+  payloadsMessagesDepuisEvenementWebSocket,
+  serialiserMessageWebSocketTicket,
   texteMessageDepuisPayloadWs,
   ticketsApiCreer,
+  ticketsApiEnvoyerMessage,
   ticketsApiFermer,
   ticketsApiListerMessages,
   ticketsApiListerPourUtilisateur,
   urlWebSocketTicketUtilisateur,
 } from '@/lib/api/tickets-api'
+import { lireEmailUtilisateurStockage } from '@/lib/api/session-client'
 import type { MessageTicket, TicketSupportUser } from '@/lib/types-user'
 import type { ColonneTable, ConfigPagination } from '@/lib/types-admin'
 import { OPTIONS_ELEMENTS_PAR_PAGE_TICKETS } from '@/lib/constants-pagination'
@@ -84,23 +88,30 @@ export default function PageAssistance() {
   const [fermetureEnCours, setFermetureEnCours] = useState(false)
   const refWs = useRef<WebSocket | null>(null)
   const refScrollFin = useRef<HTMLDivElement | null>(null)
+  const [emailProfil, setEmailProfil] = useState<string | null>(null)
+
+  useEffect(() => {
+    setEmailProfil(lireEmailUtilisateurStockage())
+  }, [])
 
   const ticketsFiltres = useMemo(() => {
     let liste = [...ticketsComplets]
     const q = recherche.trim().toLowerCase()
     if (q) {
+      const emailQ = (emailProfil ?? '').toLowerCase()
       liste = liste.filter(
         (t) =>
           t.sujet.toLowerCase().includes(q) ||
           t.message.toLowerCase().includes(q) ||
-          t.id.toLowerCase().includes(q),
+          t.id.toLowerCase().includes(q) ||
+          (emailQ && emailQ.includes(q)),
       )
     }
     if (apiRestActive) {
       liste.sort((a, b) => b.dateCreation.getTime() - a.dateCreation.getTime())
     }
     return liste
-  }, [ticketsComplets, recherche, apiRestActive])
+  }, [ticketsComplets, recherche, apiRestActive, emailProfil])
 
   const ticketsPage = useMemo(() => {
     if (apiRestActive) {
@@ -128,22 +139,24 @@ export default function PageAssistance() {
         refWs.current = ws
         ws.onmessage = (evt) => {
           try {
-            const data = JSON.parse(String(evt.data)) as Record<string, unknown>
-            const expediteur = expediteurIdDepuisPayloadWs(data)
+            const fragments = payloadsMessagesDepuisEvenementWebSocket(String(evt.data))
             const uid = lireIdUtilisateurStockage()
-            if (uid && expediteur === uid) return
-            const texte = texteMessageDepuisPayloadWs(data)
-            if (!texte.trim()) return
-            setMessagesChat((prev) => [
-              ...prev,
-              {
-                id: `ws_${Date.now()}`,
-                ticketId,
-                auteur: 'support',
-                contenu: texte,
-                dateEnvoi: new Date(),
-              },
-            ])
+            for (const data of fragments) {
+              const expediteur = expediteurIdDepuisPayloadWs(data)
+              if (uid && expediteur === uid) continue
+              const texte = texteMessageDepuisPayloadWs(data)
+              if (!texte.trim()) continue
+              setMessagesChat((prev) => [
+                ...prev,
+                {
+                  id: `ws_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+                  ticketId,
+                  auteur: 'support',
+                  contenu: texte,
+                  dateEnvoi: new Date(),
+                },
+              ])
+            }
           } catch {
             /* ignore */
           }
@@ -179,39 +192,22 @@ export default function PageAssistance() {
     }
   }, [])
 
-  const chargerConversationsMock = useCallback(async () => {
-    setEstChargement(true)
-    setErreurListe(null)
-    try {
-      const rep = await recupererTicketsUser(pagination.page, pagination.parPage, {
-        recherche,
-        statut: 'tous',
+  useEffect(() => {
+    if (apiRestActive) {
+      queueMicrotask(() => {
+        void chargerConversationsApi()
       })
-      if (rep.succes && rep.donnees) {
-        setTicketsComplets(rep.donnees)
-        if (rep.pagination) setPagination(rep.pagination)
-      } else {
-        setErreurListe(rep.erreur ?? 'Chargement impossible')
-      }
-    } finally {
-      setEstChargement(false)
-      setLoadingRetry(false)
+      return
     }
-  }, [pagination.page, pagination.parPage, recherche])
-
-  useEffect(() => {
-    if (!apiRestActive) return
-    queueMicrotask(() => {
-      void chargerConversationsApi()
-    })
+    setEstChargement(true)
+    setErreurListe(
+      "L'API tickets n'est pas configurée (URL d'API et préfixe service utilisateur).",
+    )
+    setTicketsComplets([])
+    setPagination((p) => ({ ...p, total: 0, page: 1 }))
+    setEstChargement(false)
+    setLoadingRetry(false)
   }, [apiRestActive, chargerConversationsApi])
-
-  useEffect(() => {
-    if (apiRestActive) return
-    queueMicrotask(() => {
-      void chargerConversationsMock()
-    })
-  }, [apiRestActive, chargerConversationsMock])
 
   useEffect(() => {
     if (!ticketModal) {
@@ -234,31 +230,24 @@ export default function PageAssistance() {
       setSaisieMessage('')
       setChargementMessages(true)
       const uid = lireIdUtilisateurStockage()
+      const messageInitial: MessageTicket[] = [
+        {
+          id: `init_${t.id}`,
+          ticketId: t.id,
+          auteur: 'utilisateur',
+          contenu: t.message || t.sujet,
+          dateEnvoi: t.dateCreation,
+        },
+      ]
       if (apiRestActive) {
         const rep = await ticketsApiListerMessages(t.id, uid)
         if (rep.ok && rep.messages && rep.messages.length > 0) {
           setMessagesChat(rep.messages)
         } else {
-          setMessagesChat([
-            {
-              id: `init_${t.id}`,
-              ticketId: t.id,
-              auteur: 'utilisateur',
-              contenu: t.message || t.sujet,
-              dateEnvoi: t.dateCreation,
-            },
-          ])
+          setMessagesChat(messageInitial)
         }
       } else {
-        setMessagesChat([
-          {
-            id: `init_${t.id}`,
-            ticketId: t.id,
-            auteur: 'utilisateur',
-            contenu: t.message || t.sujet,
-            dateEnvoi: t.dateCreation,
-          },
-        ])
+        setMessagesChat(messageInitial)
       }
       setChargementMessages(false)
     },
@@ -268,6 +257,11 @@ export default function PageAssistance() {
   const envoyerMessage = () => {
     const texte = saisieMessage.trim()
     if (!texte || !ticketModal) return
+    const uid = lireIdUtilisateurStockage()
+    if (!uid) {
+      setErreurListe('Session incomplète : identifiant utilisateur manquant pour envoyer un message.')
+      return
+    }
     const msg: MessageTicket = {
       id: `local_${Date.now()}`,
       ticketId: ticketModal.id,
@@ -278,27 +272,29 @@ export default function PageAssistance() {
     setMessagesChat((p) => [...p, msg])
     setSaisieMessage('')
     const urlWs = urlWebSocketTicketUtilisateur(ticketModal.id)
-    if (!urlWs) return
-    const uid = lireIdUtilisateurStockage() ?? 'local'
-    const corps = JSON.stringify({
-      ticket_id: ticketModal.id,
-      sender_id: uid,
-      message: texte,
-      created_at: new Date().toISOString(),
-      type: 'user_message',
+    const corps = serialiserMessageWebSocketTicket(uid, texte, {
+      ticketId: ticketModal.id,
+      typeMessage: 'user_message',
     })
-    const envoyerSiPret = () => {
-      const ws = refWs.current
-      if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(corps)
-        return true
+    if (!urlWs) {
+      if (apiRestActive) {
+        void ticketsApiEnvoyerMessage(ticketModal.id, texte).then((rep) => {
+          if (!rep.ok) setErreurListe(rep.erreur ?? 'Envoi du message impossible.')
+        })
+      } else {
+        setErreurListe("Envoi par HTTP impossible : API tickets non configurée.")
       }
-      return false
+      return
     }
-    if (envoyerSiPret()) return
+    if (envoyerSurWebSocketTicket(refWs.current, corps)) return
     window.setTimeout(() => {
-      void envoyerSiPret()
-    }, 1000)
+      if (envoyerSurWebSocketTicket(refWs.current, corps)) return
+      if (apiRestActive) {
+        void ticketsApiEnvoyerMessage(ticketModal.id, texte).then((rep) => {
+          if (!rep.ok) setErreurListe(rep.erreur ?? 'Envoi du message impossible.')
+        })
+      }
+    }, 1500)
   }
 
   const soumettreNouvelleDemande = async (e: React.FormEvent) => {
@@ -312,24 +308,21 @@ export default function PageAssistance() {
     }
     setEnvoiEnCours(true)
     try {
-      if (apiRestActive) {
-        const rep = await ticketsApiCreer(t, d)
-        if (!rep.ok) {
-          setErreurFormulaire(rep.erreur ?? 'Creation impossible')
-          return
-        }
-      } else {
-        const rep = await creerTicketSupport(t, d, 'normale')
-        if (!rep.succes) {
-          setErreurFormulaire(rep.erreur ?? 'Creation impossible')
-          return
-        }
+      if (!apiRestActive) {
+        setErreurFormulaire(
+          "L'API tickets n'est pas configurée (URL d'API et préfixe service utilisateur).",
+        )
+        return
+      }
+      const rep = await ticketsApiCreer(t, d)
+      if (!rep.ok) {
+        setErreurFormulaire(rep.erreur ?? 'Creation impossible')
+        return
       }
       setTitre('')
       setDescription('')
       setModaleCreationOuverte(false)
-      if (apiRestActive) await chargerConversationsApi()
-      else await chargerConversationsMock()
+      await chargerConversationsApi()
     } finally {
       setEnvoiEnCours(false)
     }
@@ -339,23 +332,18 @@ export default function PageAssistance() {
     if (!ticketModal) return
     setFermetureEnCours(true)
     try {
-      if (apiRestActive) {
-        const rep = await ticketsApiFermer(ticketModal.id)
-        if (!rep.ok) {
-          setErreurListe(rep.erreur ?? 'Cloture impossible')
-          return
-        }
-      } else {
-        setTicketsComplets((prev) =>
-          prev.map((x) =>
-            x.id === ticketModal.id ? { ...x, statut: 'resolu' as const, statutBrutApi: 'CLOSED' } : x,
-          ),
-        )
+      if (!apiRestActive) {
+        setErreurListe("Clôture impossible : API tickets non configurée.")
+        return
+      }
+      const rep = await ticketsApiFermer(ticketModal.id)
+      if (!rep.ok) {
+        setErreurListe(rep.erreur ?? 'Cloture impossible')
+        return
       }
       setTicketModal(null)
       setMessagesChat([])
-      if (apiRestActive) await chargerConversationsApi()
-      else await chargerConversationsMock()
+      await chargerConversationsApi()
     } finally {
       setFermetureEnCours(false)
     }
@@ -373,7 +361,12 @@ export default function PageAssistance() {
   const gererRetry = () => {
     setLoadingRetry(true)
     if (apiRestActive) void chargerConversationsApi()
-    else void chargerConversationsMock()
+    else {
+      setErreurListe(
+        "L'API tickets n'est pas configurée (URL d'API et préfixe service utilisateur).",
+      )
+      setLoadingRetry(false)
+    }
   }
 
   const colonnes: ColonneTable<TicketSupportUser>[] = useMemo(
@@ -386,6 +379,16 @@ export default function PageAssistance() {
             <p className="truncate font-medium text-foreground">{t.sujet}</p>
             <p className="line-clamp-1 text-xs text-muted-foreground">{t.message}</p>
           </div>
+        ),
+      },
+      {
+        id: 'email',
+        label: 'Email',
+        largeur: '200px',
+        accesseur: () => (
+          <span className="block truncate text-sm text-muted-foreground" title={emailProfil ?? undefined}>
+            {emailProfil ?? '—'}
+          </span>
         ),
       },
       {
@@ -432,7 +435,7 @@ export default function PageAssistance() {
         ),
       },
     ],
-    [ouvrirConversation],
+    [ouvrirConversation, emailProfil],
   )
 
   const paginationPourTable: ConfigPagination | undefined =
@@ -447,11 +450,11 @@ export default function PageAssistance() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="space-y-3 sm:space-y-5 md:space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Assistance</h2>
-          <p className="text-sm text-slate-500">Suivez vos echanges avec le support</p>
+          <h2 className="text-base font-semibold text-slate-900 sm:text-lg">Assistance</h2>
+          <p className="text-xs text-slate-500 sm:text-sm">Suivez vos echanges avec le support</p>
         </div>
         <Button
           type="button"
@@ -466,14 +469,7 @@ export default function PageAssistance() {
         </Button>
       </div>
 
-      {apiRestActive && (
-        <p className="text-xs text-muted-foreground">
-          API tickets : definissez NEXT_PUBLIC_API_BASE_URL, NEXT_PUBLIC_API_USER_SERVICE, le jeton localStorage
-          &quot;token&quot; et userinfo avec id. WebSocket optionnel : NEXT_PUBLIC_WS_TICKETS_URL.
-        </p>
-      )}
-
-      <div className="space-y-4">
+      <div className="space-y-2 sm:space-y-3 md:space-y-4">
         {erreurListe && (
           <Alert variant="destructive">
             <AlertTitle>Erreur</AlertTitle>
@@ -502,7 +498,7 @@ export default function PageAssistance() {
               selectParPageAuDessusDuTableau
               aCoteSelectParPage={
                 <ChampRecherche
-                  placeholder="Titre, message, id..."
+                  placeholder="Titre, message, id, email..."
                   valeur={recherche}
                   onChange={gererRecherche}
                   className="min-w-0 w-full flex-1 sm:min-w-[220px] sm:max-w-md"

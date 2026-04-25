@@ -5,6 +5,9 @@ import type { StatutTransaction } from '@/lib/types-admin'
 export type StatutDocument = 'en-cours' | 'termine' | 'erreur'
 export type TypeFichier = 'pdf' | 'image' | 'word' | 'autre'
 
+/** Données structurées renvoyées par `/ia-data/process_document` (champs variables selon le type de document). */
+export type DonneesExtraitesOcr = Record<string, unknown>
+
 export interface DocumentOCR {
   id: string
   nomFichier: string
@@ -16,6 +19,19 @@ export interface DocumentOCR {
   nombrePages?: number
   tempsTraitement?: number // en secondes
   precision?: number // pourcentage
+  /** Message principal de l’API (ex. « Analyse de document terminée. ») */
+  messageTraitement?: string
+  /** Valeur de `data.detected_type` (ex. PASSPORT, ID_CARD) */
+  typeDocumentDetecte?: string
+  /** Objet `data.extracted_data` */
+  donneesExtraites?: DonneesExtraitesOcr
+  /** `data.feedback.messages` */
+  messagesFeedback?: string[]
+  /** Noms de fichiers côté serveur après traitement */
+  nomFichierRectoApi?: string | null
+  nomFichierVersoApi?: string | null
+  /** `data.status` */
+  statutReponseApi?: string
 }
 
 export interface HistoriqueAppel {

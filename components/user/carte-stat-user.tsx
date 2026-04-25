@@ -63,7 +63,7 @@ export function CarteStatUser({
   if (estChargement) {
     return (
       <Card className="h-full border-border/40 shadow-sm">
-        <CardContent className="flex flex-col gap-1.5 p-4">
+        <CardContent className="flex flex-col gap-1 p-2.5 sm:gap-1.5 sm:p-4">
           <div className="flex items-center justify-between gap-2">
             <Skeleton className="h-3.5 w-32" />
             <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
@@ -87,7 +87,7 @@ export function CarteStatUser({
     return (
       <p
         className={cn(
-          'flex flex-wrap items-center gap-x-1 text-[11px] leading-tight',
+          'flex flex-wrap items-center gap-x-1 text-[10px] leading-tight sm:text-[11px]',
           estNeutre && 'text-muted-foreground',
           estPositif && 'text-emerald-600',
           !estPositif && !estNeutre && 'text-red-600'
@@ -111,22 +111,25 @@ export function CarteStatUser({
 
   return (
     <Card className="h-full border-border/40 transition-shadow hover:shadow-md">
-      <CardContent className="flex flex-col gap-1.5 p-4">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="line-clamp-2 flex-1 text-left text-sm font-medium leading-tight text-muted-foreground">
+      <CardContent className="flex flex-col gap-1 p-2.5 sm:gap-1.5 sm:p-4">
+        <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+          <h3 className="line-clamp-2 flex-1 text-left text-[10px] font-medium leading-tight text-muted-foreground sm:text-xs md:text-sm">
             {titre}
           </h3>
           <div
-            className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', config.fond)}
+            className={cn(
+              'flex h-7 w-7 shrink-0 items-center justify-center rounded-md sm:h-9 sm:w-9 sm:rounded-lg',
+              config.fond,
+            )}
             aria-hidden
           >
-            <Icone className={cn('h-4 w-4', config.icone)} />
+            <Icone className={cn('h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4', config.icone)} />
           </div>
         </div>
-        <p className="text-2xl font-semibold leading-none tracking-tight text-foreground tabular-nums sm:text-[1.75rem]">
+        <p className="text-lg font-semibold leading-none tracking-tight text-foreground tabular-nums sm:text-xl md:text-2xl md:tracking-tight">
           {formaterValeur()}
         </p>
-        <div className="flex min-h-0 flex-col gap-0.5 text-[11px] text-muted-foreground">
+        <div className="flex min-h-0 flex-col gap-0.5 text-[10px] text-muted-foreground sm:text-[11px]">
           {renderVariation()}
           {description ? <p className="line-clamp-1 leading-tight">{description}</p> : null}
         </div>

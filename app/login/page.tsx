@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { lire2faRequisUtilisateur } from '@/lib/mfa-preference'
+import { estBackendUtilisateurConfigure } from '@/lib/api/env-backend'
+import { chargerProfilUtilisateur, connexionUtilisateur } from '@/lib/api/auth-api'
 
 export default function PageConnexion() {
   const router = useRouter()
@@ -24,22 +26,50 @@ export default function PageConnexion() {
     setErreur('')
     setEstChargement(true)
 
-    // Simulation d'appel API
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    if (email && motDePasse) {
-      const cible = '/user'
-      if (lire2faRequisUtilisateur()) {
-        router.push(
-          `/otp?email=${encodeURIComponent(email)}&next=${encodeURIComponent(cible)}`
-        )
-      } else {
-        router.push(cible)
-      }
-    } else {
+    if (!email || !motDePasse) {
       setErreur('Veuillez remplir tous les champs')
       setEstChargement(false)
+      return
     }
+
+    const cible = '/user'
+
+    if (estBackendUtilisateurConfigure()) {
+      const res = await connexionUtilisateur(email, motDePasse)
+      if (res.type === 'erreur') {
+        setErreur(res.message)
+        setEstChargement(false)
+        return
+      }
+      if (res.type === 'otp_2fa') {
+        router.push(
+          `/otp?email=${encodeURIComponent(email)}&next=${encodeURIComponent(cible)}&profile=user&mode=connexion&userid=${encodeURIComponent(res.userId)}`
+        )
+        setEstChargement(false)
+        return
+      }
+      if (res.type === 'session') {
+        const profil = await chargerProfilUtilisateur(res.token)
+        if (!profil.ok) {
+          setErreur(profil.erreur ?? 'Impossible de charger le profil.')
+          setEstChargement(false)
+          return
+        }
+        router.push(cible)
+        setEstChargement(false)
+        return
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    if (lire2faRequisUtilisateur()) {
+      router.push(
+        `/otp?email=${encodeURIComponent(email)}&next=${encodeURIComponent(cible)}`
+      )
+    } else {
+      router.push(cible)
+    }
+    setEstChargement(false)
   }
 
   return (

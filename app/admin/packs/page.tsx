@@ -57,6 +57,8 @@ const champsFormulairePack: ChampFormulaire[] = [
   },
 ]
 
+const champsFormulairePackModification = champsFormulairePack.filter((c) => c.id !== 'description')
+
 function estPackActifDepuisFormulaire(valeur: string | number | boolean | undefined): boolean {
   return valeur === true || valeur === 'true'
 }
@@ -128,7 +130,6 @@ export default function PagePacks() {
 
     const misesAJour: Partial<Pack> = {
       nom: String(donnees.nom).trim(),
-      description: String(donnees.description ?? '').trim(),
       quotas: Math.max(1, Number(donnees.quotas)),
       prix: Number(donnees.prix),
       dureeValidite: Math.max(1, Number(donnees.dureeValidite)),
@@ -210,20 +211,6 @@ export default function PagePacks() {
         accesseur: (pack) => (
           <span className="font-medium text-foreground">{pack.nom}</span>
         ),
-      },
-      {
-        id: 'description',
-        label: 'Description',
-        largeur: '240px',
-        classNameCellule: 'max-w-[240px] min-w-0 whitespace-normal',
-        accesseur: (pack) => {
-          const texte = pack.description || '—'
-          return (
-            <p className="truncate text-sm text-muted-foreground" title={texte !== '—' ? texte : undefined}>
-              {texte}
-            </p>
-          )
-        },
       },
       {
         id: 'quotas',
@@ -360,13 +347,12 @@ export default function PagePacks() {
         onSoumettre={gererModification}
         titre="pack"
         description="Modifiez les informations du pack"
-        champs={champsFormulairePack}
+        champs={champsFormulairePackModification}
         texteValidation="Enregistrer"
         donneesInitiales={
           packSelectionne
             ? {
                 nom: packSelectionne.nom,
-                description: packSelectionne.description,
                 quotas: packSelectionne.quotas,
                 prix: packSelectionne.prix,
                 dureeValidite: packSelectionne.dureeValidite,

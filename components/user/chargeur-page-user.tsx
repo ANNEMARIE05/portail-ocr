@@ -18,17 +18,17 @@ export function ChargeurPageUser({
   typeAffichage = 'grille',
 }: PropsChargeurPageUser) {
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-2 animate-in fade-in duration-500 sm:space-y-4 md:space-y-6">
       {/* Cartes de statistiques */}
       {avecCartes > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 md:gap-3 lg:grid-cols-4">
           {Array.from({ length: avecCartes }).map((_, i) => (
             <Card 
               key={i} 
               className="border-border/40 overflow-hidden"
               style={{ animationDelay: `${i * 100}ms` }}
             >
-              <CardContent className="flex flex-col gap-1.5 p-4">
+              <CardContent className="flex flex-col gap-1 p-2.5 sm:gap-1.5 sm:p-4">
                 <div className="flex items-center justify-between gap-2">
                   <Skeleton className="h-3.5 w-32" />
                   <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
@@ -47,7 +47,7 @@ export function ChargeurPageUser({
       {/* Zone d'actions */}
       {avecActions && (
         <Card className="border-border/40 border-dashed">
-          <CardContent className="flex flex-col items-center justify-center p-12">
+          <CardContent className="flex flex-col items-center justify-center p-6 sm:p-10 md:p-12">
             <Skeleton className="h-16 w-16 rounded-xl mb-4" />
             <Skeleton className="h-6 w-48 mb-2" />
             <Skeleton className="h-4 w-64" />
@@ -69,7 +69,7 @@ export function ChargeurPageUser({
           </CardHeader>
           <CardContent>
             {typeAffichage === 'grille' ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 md:gap-4 lg:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div 
                     key={i} 
@@ -118,8 +118,8 @@ export function ChargeurPageUser({
 export function ChargeurCarteAction() {
   return (
     <Card className="border-border/40 border-dashed animate-pulse">
-      <CardContent className="flex flex-col items-center justify-center p-12">
-        <div className="h-16 w-16 rounded-xl bg-slate-100 mb-4" />
+      <CardContent className="flex flex-col items-center justify-center p-6 sm:p-10 md:p-12">
+        <div className="mb-3 h-14 w-14 rounded-xl bg-slate-100 sm:mb-4 sm:h-16 sm:w-16" />
         <div className="h-6 w-48 rounded bg-slate-100 mb-2" />
         <div className="h-4 w-64 rounded bg-slate-100" />
       </CardContent>

@@ -12,8 +12,13 @@ import { ModaleFormulaire, type ChampFormulaire } from '@/components/admin/form-
 import { ModaleDetail, type SectionDetail } from '@/components/admin/detail-modal'
 import { TableDonnees } from '@/components/admin/data-table'
 import { ChampRecherche } from '@/components/admin/search-input'
-import { recupererAdministrateurs } from '@/lib/api/admin-service'
-import { administrateursMock } from '@/lib/mock/donnees-utilisateurs'
+import {
+  creerAdministrateur,
+  modifierAdministrateur,
+  recupererAdministrateurs,
+  supprimerAdministrateur,
+} from '@/lib/api/admin-service'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import type { Administrateur, ColonneTable, ActionLigne, ConfigPagination } from '@/lib/types-admin'
 import { formaterDateCourte, formaterDateRelative, genererInitiales, separerPrenomNom } from '@/lib/utils/formatage'
 import { cn } from '@/lib/utils'
@@ -58,7 +63,7 @@ const champsFormulaireModification: ChampFormulaire[] = [
     c.id === 'role' ? { ...c, options: optionsRoleModification } : c,
   ),
   { id: 'estActif', label: 'Compte actif', type: 'switch', description: 'Activer ce compte administrateur' },
-]
+].map((c) => (c.id === 'email' ? c : { ...c, desactive: true })) as ChampFormulaire[]
 
 export default function PageAdministrateurs() {
   const [estChargement, setEstChargement] = useState(true)
@@ -71,6 +76,7 @@ export default function PageAdministrateurs() {
   const [modaleModificationOuverte, setModaleModificationOuverte] = useState(false)
   const [modaleDetailOuverte, setModaleDetailOuverte] = useState(false)
   const [modaleSuppressionOuverte, setModaleSuppressionOuverte] = useState(false)
+  const [messageErreur, setMessageErreur] = useState<string | null>(null)
 
   const chargerAdministrateurs = useCallback(async () => {
     setEstChargement(true)
@@ -105,76 +111,100 @@ export default function PageAdministrateurs() {
   }
 
   const gererCreation = async (donnees: Record<string, string | number | boolean>) => {
+    setMessageErreur(null)
     const { prenom, nom } = separerPrenomNom(String(donnees.nomComplet))
-    const nouvelAdmin: Administrateur = {
-      id: `admin-${Date.now()}`,
+    const reponse = await creerAdministrateur({
       prenom,
       nom,
       email: String(donnees.email),
       role: donnees.role as Administrateur['role'],
-      dateCreation: new Date(),
-      derniereActivite: new Date(),
-      estActif: true,
+    })
+    if (!reponse.succes) {
+      setMessageErreur(reponse.erreur ?? 'Création impossible')
+      return
     }
-    administrateursMock.unshift(nouvelAdmin)
-    const reponse = await recupererAdministrateurs(1, pagination.parPage, {
+    setModaleCreationOuverte(false)
+    setPagination((prev) => ({ ...prev, page: 1 }))
+    const refresh = await recupererAdministrateurs(1, pagination.parPage, {
       recherche,
       role: 'tous',
       statutCompte: 'tous',
     })
-    if (reponse.succes && reponse.donnees) {
-      setAdministrateurs(reponse.donnees)
-      if (reponse.pagination) setPagination(reponse.pagination)
+    if (refresh.succes && refresh.donnees) {
+      setAdministrateurs(refresh.donnees)
+      if (refresh.pagination) {
+        setPagination(refresh.pagination)
+      }
     }
   }
 
   const gererModification = async (donnees: Record<string, string | number | boolean>) => {
-    if (!adminSelectionne) return
-
-    const { prenom, nom } = separerPrenomNom(String(donnees.nomComplet))
-    const adminMisAJour: Administrateur = {
-      ...adminSelectionne,
-      prenom,
-      nom,
+    if (!adminSelectionne) {
+      return
+    }
+    setMessageErreur(null)
+    const reponse = await modifierAdministrateur(adminSelectionne.id, {
+      prenom: adminSelectionne.prenom,
+      nom: adminSelectionne.nom,
       email: String(donnees.email),
-      role: donnees.role as Administrateur['role'],
-      estActif: Boolean(donnees.estActif),
+      role: adminSelectionne.role,
+      estActif: adminSelectionne.estActif,
+    })
+    if (!reponse.succes) {
+      setMessageErreur(reponse.erreur ?? 'Mise à jour impossible')
+      return
     }
-
-    const index = administrateursMock.findIndex((a) => a.id === adminSelectionne.id)
-    if (index >= 0) {
-      administrateursMock[index] = adminMisAJour
-    }
-
-    const reponse = await recupererAdministrateurs(pagination.page, pagination.parPage, {
+    setModaleModificationOuverte(false)
+    setAdminSelectionne(null)
+    const refresh = await recupererAdministrateurs(pagination.page, pagination.parPage, {
       recherche,
       role: 'tous',
       statutCompte: 'tous',
     })
-    if (reponse.succes && reponse.donnees) {
-      setAdministrateurs(reponse.donnees)
-      if (reponse.pagination) setPagination(reponse.pagination)
+    if (refresh.succes && refresh.donnees) {
+      setAdministrateurs(refresh.donnees)
+      if (refresh.pagination) {
+        setPagination(refresh.pagination)
+      }
     }
   }
 
-  const gererSuppression = () => {
-    if (!adminSelectionne) return
-    const index = administrateursMock.findIndex((a) => a.id === adminSelectionne.id)
-    if (index >= 0) {
-      administrateursMock.splice(index, 1)
+  const gererSuppression = async () => {
+    if (!adminSelectionne) {
+      return
+    }
+    setMessageErreur(null)
+    const reponse = await supprimerAdministrateur(adminSelectionne.id)
+    if (!reponse.succes) {
+      setMessageErreur(reponse.erreur ?? 'Suppression impossible')
+      return
     }
     setModaleSuppressionOuverte(false)
     setAdminSelectionne(null)
-    void recupererAdministrateurs(pagination.page, pagination.parPage, {
-      recherche,
-      role: 'tous',
-      statutCompte: 'tous',
-    }).then((reponse) => {
-      if (reponse.succes && reponse.donnees) {
-        setAdministrateurs(reponse.donnees)
-        if (reponse.pagination) setPagination(reponse.pagination)
+    const filtresListe = { recherche, role: 'tous' as const, statutCompte: 'tous' as const }
+    let p = pagination.page
+    const refresh = await recupererAdministrateurs(p, pagination.parPage, filtresListe)
+    if (refresh.succes && refresh.donnees && refresh.pagination) {
+      if (refresh.donnees.length === 0 && refresh.pagination.total > 0) {
+        p = Math.max(1, p - 1)
+        setPagination((prev) => ({ ...prev, page: p }))
+        const rechargement = await recupererAdministrateurs(p, refresh.pagination.parPage, filtresListe)
+        if (rechargement.succes && rechargement.donnees) {
+          setAdministrateurs(rechargement.donnees)
+        }
+        if (rechargement?.pagination) {
+          setPagination(rechargement.pagination)
+        }
+        return
       }
-    })
+      if (refresh.donnees.length === 0 && refresh.pagination.total === 0) {
+        setAdministrateurs([])
+        setPagination(refresh.pagination)
+        return
+      }
+      setAdministrateurs(refresh.donnees)
+      setPagination(refresh.pagination)
+    }
   }
 
   const getSectionsDetail = (admin: Administrateur): SectionDetail[] => [
@@ -289,6 +319,12 @@ export default function PageAdministrateurs() {
 
   return (
     <div className="space-y-6">
+      {messageErreur && (
+        <Alert variant="destructive" className="py-2">
+          <AlertTitle>Action refusée</AlertTitle>
+          <AlertDescription>{messageErreur}</AlertDescription>
+        </Alert>
+      )}
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <div className="min-w-0 flex-1 space-y-1">
           <h2 className="text-base font-semibold tracking-tight text-foreground">Liste des administrateurs</h2>
@@ -349,7 +385,7 @@ export default function PageAdministrateurs() {
         }}
         onSoumettre={gererModification}
         titre="administrateur"
-        description="Modifiez les informations de l'administrateur"
+        description="Seul l'email est modifiable (nom, rôle et statut du compte se gèrent ailleurs)"
         champs={champsFormulaireModification}
         texteValidation="Enregistrer"
         donneesInitiales={
